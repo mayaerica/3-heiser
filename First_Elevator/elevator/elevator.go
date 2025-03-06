@@ -1,14 +1,17 @@
 package elevator
 
 import (
-	eio "Driver-go/elevio"
+	"elevatorlab/elevio"
 	"time"
 )
+
+const N_FLOORS int = 4
+const N_BUTTONS int = 3
 
 type Elevator struct {
 	Id        int 		//busy, added from lories code
 	Floor     int
-	Dirn eio.Dirn         // moving up, down, or emergency stop
+	Dirn      elevio.Dirn         // moving up, down, or emergency stop
 	Behaviour ElevatorBehaviour // idle, door open, moving
 	Requests  [4][3]bool        // Requests for each floor and direction (3 buttons per floor)
 	Busy	  bool 				//Busy, added from lories code

@@ -1,39 +1,64 @@
 package main
 
 import (
-	tcp "Driver-go/TCP"
-	el "Driver-go/elevator"
-	eiod "Driver-go/elevator_io_device"
-	eio "Driver-go/elevio"
-	fsm "Driver-go/fsm"
-	req "Driver-go/requests"
-	res "Driver-go/resource"
-	timer "Driver-go/timer"
-	rm "Driver-go/resource"
+	"elevatorlab/elevator"
+	"elevatorlab/elevio"
+	"elevatorlab/fsm"
+	"elevatorlab/requests"
+	"elevatorlab/resource"
+	"elevatorlab/timer"
+	"elevatorlab/messageProcessing"
+	"elevatorlab/network/bcast"
+	"elevatorlab/network/localip"
+	"elevatorlab/network/peers"
 	"fmt"
 	"time"
 )
 
+
+var UpdateIntervall = 1000 * time.Millisecond
 const numElevators = 3
 var master = true
 
 func main() {
+	var id string
+	//UDP
 
-	//message sendt to other elevators
+	peerUpdateCh := make(chan peers.PeerUpdate)  // Channel for updates related to peers
+	peerTxEnable := make(chan bool)              // Channel to enable or disable transmission
+	messageTx := make(chan messageProcessing.Message)          // Channel for transmitting "hello" messages
+	messageRx := make(chan messageProcessing.Message)          // Channel for receiving "hello" messages
+
+
+
+	//between elevators 1 and 2
+	go peers.Transmitter(15012, id, peerTxEnable)
+	go peers.Receiver(15012, peerUpdateCh)
+	go bcast.Transmitter(16612, messageTx)
+	go bcast.Receiver(16612, messageRx)
 	
 
-	//////////////////REQUEST///////////////////////////
+	//between elevators 1 and 3
+	go peers.Transmitter(15013, id, peerTxEnable)
+	go peers.Receiver(15013, peerUpdateCh)
+	go bcast.Transmitter(16613, messageTx)
+	go bcast.Receiver(16613, messageRx)
+	localIP, err := localip.LocalIP()
 
-	//var elevatorStatusChan = make(chan el.Elevator, numElevators*5)
-	var requestChan = make(chan req.Request, numElevators*5)
-	var assignChan = make(chan req.Request, numElevators*5)
+	fmt.Println(localIP)
 
-	// Example of elevator instances
+	if err != nil {
+		fmt.Println("Error serializing message:", err)
+	}
+
+
+	//var elevatorStatusChan = make(chan elevator.Elevator, numElevators*5)
+	var requestChan = make(chan requests.Request, numElevators*5)
+	var dummyChan = make(chan requests.Request, numElevators*5)
+	var assignChan = make(chan requests.Request, numElevators*5)
+	dummyChan <- requests.Request{}
 	
 
-	// Start request dispatcher
-
-	// Simulate new request
 
 	time.Sleep(5 * time.Millisecond) // Allow processing time
 
@@ -45,19 +70,29 @@ func main() {
 	//var elevator Elevator
 	fsm.Elevator.ClearRequestVariant = 1
 	fsm.Elevator.DoorOpenDuration = 1000 * time.Millisecond
-	fsm.Elevator.Behaviour = el.IDLE
-	fsm.Elevator.Dirn = eio.MD_Stop
+	fsm.Elevator.Behaviour = elevator.IDLE
+	fsm.Elevator.Dirn = elevio.MD_Stop
 	fsm.Elevator.Id = 8081
 
-	msg := tcp.Message{
-		Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
-		Active1:       true, 
-		Active2:       true,
-		Active3:       true,
-		Requests: make([]req.Request, 0), // Initialize an empty slice for ButtonRequests
-	}
 
-	eio.Init("localhost:15657", eiod.N_FLOORS) //15657
+
+	go func() {
+		for {
+			msg := messageProcessing.Message{
+				Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
+				Active1:       true, 
+				Active2:       true,
+				Active3:       true,
+				Requests: make([]requests.Request, 0), // Initialize an empty slice for ButtonRequests
+			}
+			messageTx <- msg
+
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+
+	elevio.Init("localhost:15657", eiod.N_FLOORS) //15657
 
 
 	
@@ -67,7 +102,7 @@ func main() {
 
 	//elevio.SetMotorDirection(d)
 
-	BtnEventChan := make(chan eio.ButtonEvent)
+	BtnEventChan := make(chan elevio.ButtonEvent)
 	FloorChan := make(chan int)
 	ObstructionChan := make(chan bool)
 	StopChan := make(chan bool)
@@ -77,32 +112,29 @@ func main() {
 	maintimer := time.NewTimer(time.Duration(fsm.Elevator.DoorOpenDuration))
 	maintimer.Stop()
 	
-	go res.ResourceManager(requestChan, assignChan)
-	rm.UpdateElevators(tcp.GetLastReceivedMessages(),requestChan)
+	go resource.ResourceManager(requestChan, assignChan)
 	
-	go tcp.StartServer()
 	
-	go eio.PollButtons(BtnEventChan)
-	go eio.PollFloorSensor(FloorChan)
-	go eio.PollObstructionSwitch(ObstructionChan)
-	go eio.PollStopButton(StopChan)
+	go elevio.PollButtons(BtnEventChan)
+	go elevio.PollFloorSensor(FloorChan)
+	go elevio.PollObstructionSwitch(ObstructionChan)
+	go elevio.PollStopButton(StopChan)
 	go timer.Start(maintimer, TimerStartChan)
 	x := <-FloorChan
 	
-
-	ticker := time.NewTicker(tcp.UpdateIntervall) // Adjust time as needed
+	ticker := time.NewTicker(UpdateIntervall) // Adjust time as needed
 	defer ticker.Stop()
 
 	/*if x == -1 {
 	    x = <-drv_floors
-	    eio.SetMotorDirection(1)
+	    elevio.SetMotorDirection(1)
 	    fmt.Printf("x=-1")
 	}*/
 
 	if x != -1 {
-		eio.SetMotorDirection(0)
-		eio.SetFloorIndicator(x)
-		fsm.Elevator.Behaviour = el.IDLE //REMOVE THIS
+		elevio.SetMotorDirection(0)
+		elevio.SetFloorIndicator(x)
+		fsm.Elevator.Behaviour = elevator.IDLE //REMOVE THIS
 		fsm.Elevator.Floor = x
 
 	}
@@ -110,52 +142,30 @@ func main() {
 
 	//send req to reqchan
 	//assignChan har request.Handeled by
-	
 	for {
 
 		select {
-		case <-ticker.C:
-			
-			tcp.SendMessage(msg)
-			messages := tcp.GetLastReceivedMessages()
-			tcp.PrintLastReceivedMessages(messages) //enable this for nice print of every elevator state
-			//fmt.Println("Flur",<-FloorChan)
-			rm.UpdateElevators(messages, requestChan)
-			msg.Requests = msg.Requests[:0]
 
+		
 
 		case a := <-BtnEventChan:
 			//fmt.Printf("%+vfor{\n", a)
-			eio.SetButtonLamp(a.Button, a.Floor, true)
+			elevio.SetButtonLamp(a.Button, a.Floor, true)
 			
-			if master {
-				requestChan <-req.Request{a,0}
-			}
 
-			
-			//fmt.Println("button set")
-			//fsm.Elevator.Requests[a.Floor][a.Button] = true
-			//fmt.Println("request in queue")
-			//fmt.Println(fsm.Elevator.Requests)
-			//fsm.OnRequestButtonPress(a.Floor, a.Button, TimerStartChan)
-			//fmt.Println(fsm.Elevator.Behaviour)
-		
-		case a :=<- assignChan:
-			if a.HandledBy == fsm.Elevator.Id {
-				fsm.Elevator.Requests[a.FloorButton.Floor][a.FloorButton.Button] = true
 
-				fsm.OnRequestButtonPress(a.FloorButton.Floor, a.FloorButton.Button, TimerStartChan)
-			} else {
-				msg.Requests=append(msg.Requests, a)
-			}
+			fsm.Elevator.Requests[a.Floor][a.Button] = true
+
+			fsm.OnRequestButtonPress(a.Floor, a.Button, TimerStartChan)
 			
+
 		
 		case a := <-FloorChan:
 			//fmt.Printf("floor %+v\n", a)
 
 			
 
-			eio.SetFloorIndicator(a)
+			elevio.SetFloorIndicator(a)
 			//requests_clearAtCurrentFloor(elevator)
 
 			if a != -1 {
@@ -167,26 +177,36 @@ func main() {
 			fmt.Printf("obstruction: %+v\n", a)
 			if a {
 				//  onDoorTimeout(timer_start)
-				if fsm.Elevator.Behaviour == el.DOOR_OPEN {
+				if fsm.Elevator.Behaviour == elevator.DOOR_OPEN {
 					TimerStartChan <- maxDuration
 				}
-				//eio.SetMotorDirection(eio.MD_Stop)
+				//elevio.SetMotorDirection(elevio.MD_Stop)
 			} else {
-				//eio.SetMotorDirection()
+				//elevio.SetMotorDirection()
 				TimerStartChan <- fsm.Elevator.DoorOpenDuration
 			}
 
 		case a := <-StopChan:
 			fmt.Printf("%+v\n", a)
 			for f := 0; f < eiod.N_FLOORS; f++ {
-				for b := eio.ButtonType(0); b < 3; b++ {
-					eio.SetButtonLamp(b, f, false)
+				for b := elevio.ButtonType(0); b < 3; b++ {
+					elevio.SetButtonLamp(b, f, false)
 				}
 			}
 
 		case <-maintimer.C:
 			//fmt.Println("On door timeout")
 			fsm.OnDoorTimeout(TimerStartChan)
+
+		case a := <-messageRx:
+			rm.UpdateElevatorsandRequests(a, requestChan) 
+
+		case <-ticker.C:
+			//rm.PrintElevators()
+
+		
+
 		}
 	}
 }
+

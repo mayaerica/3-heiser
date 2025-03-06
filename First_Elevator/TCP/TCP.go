@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	req "Driver-go/requests"
-	el "Driver-go/elevator"
-	"Driver-go/fsm" // Assuming fsm package where Elevator is defined
+	"elevatorlab/requests"
+	"elevatorlab/elevator"
+	"elevatorlab/fsm" 
 )
 
 // Mutex for shared data
@@ -22,11 +22,11 @@ var printMessageCounter = 0
 
 // Message struct with Active status
 type Message struct {
-    Elevator      el.Elevator      // Elevator field
+    Elevator      elevator.Elevator      // Elevator field
     Active1       bool             // Is Elevator 1 active?
     Active2       bool             // Is Elevator 2 active?
     Active3       bool             // Is Elevator 3 active?
-    Requests []req.Request // List of button requests
+    Requests []requests.Request // List of button requests
 }
 
 
@@ -38,9 +38,9 @@ var elevatorStatus = map[int]bool{
 }
 
 var lastReceivedMessages = map[int]Message{
-	8081: {Elevator: el.Elevator{Id: 8081}, Active1: false, Active2: false, Active3: false},
-	8082: {Elevator: el.Elevator{Id: 8082}, Active1: false, Active2: false, Active3: false},
-	8083: {Elevator: el.Elevator{Id: 8083}, Active1: false, Active2: false, Active3: false},
+	8081: {Elevator: elevator.Elevator{Id: 8081}, Active1: false, Active2: false, Active3: false},
+	8082: {Elevator: elevator.Elevator{Id: 8082}, Active1: false, Active2: false, Active3: false},
+	8083: {Elevator: elevator.Elevator{Id: 8083}, Active1: false, Active2: false, Active3: false},
 }
 
 var elevatorAddresses = map[int]string{
