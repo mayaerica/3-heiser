@@ -44,27 +44,12 @@ Future improvements and features planned:
 
 
 HOWTORUN:
-1. run two simelevator servers with the ports 10003 and 10002 (corrisponding to main 3 and main two) (either use exe or write ./SimElevatorServer --port 10002)
-2. Run the real elevatorserver or another sim. If you run another sim you have to edit main_1.go's port on line 97 from localhost:15657 to localhost:10001 (or any other port)
-
-3. run main_1,2 and 3 in seperate terminals
-
+```go run main.go -id=8081 -port=15657```
+```go run main.go -id=8082 -port=10002```
+```go run main.go -id=8083 -port=10003```
 
 For HRA:
 chmod a+rwx hall_request_assigner
 
-For packetloss (examples):
-sudo packetloss -f
-        Removes all packet loss rules, disabling packet loss
-        
-    sudo packetloss -p 12345,23456,34567 -r 0.25
-        Applies 25% packet loss to ports 12345, 23456, and 34567
-        
-    sudo packetloss -n executablename -r 0.25
-        Applies 25% packet loss to all ports used by all programs named "executablename"
-        
-    sudo packetloss -p 12345 -n executablename -r 0.25
-        Also applies 25% packet loss to port 12345
 
-    sudo packetloss -n executablename -f
-        Lists ports used by "executablename", but does not apply packet loss
+       
