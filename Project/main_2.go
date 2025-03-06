@@ -90,7 +90,7 @@ func main() {
 	}()
 
 
-	elevio.Init("localhost:10002", elevio.N_FLOORS) //15657
+	elevio.Init("localhost:10002", elevator.N_FLOORS) //15657
 
 
 	
