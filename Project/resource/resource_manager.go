@@ -121,10 +121,10 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 	var cabRequests = make([]bool, 4)     // Initialize cabRequests to match the number of floors
 
 	// Iterate through the rows of the Requests matrix (floor requests)
-	for _, elevator := range elevators {
+	for _, _elevator := range elevators {
 
 		// Floor requests for the elevator
-		requests := elevator.Requests
+		requests := _elevator.Requests
 
 		// Iterate through the rows of the Requests matrix (floor requests)
 		for i := 0; i < len(requests); i++ {
@@ -138,7 +138,7 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 		// Direction
 		var direction string
-		switch elevator.Dirn {
+		switch _elevator.Dirn {
 		case elevio.Dirn(0):
 			direction = "stop"
 		case elevio.Dirn(1):
@@ -151,20 +151,20 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 		// Behaviour
 		var behavior string
-		switch elevator.Behaviour {
-		case elevator.IDLE:
+		switch _elevator.Behaviour {
+		case elevator.ElevatorBehaviour(0):
 			behavior = "idle"
-		case elevator.DOOR_OPEN:
+		case elevator.ElevatorBehaviour(1):
 			behavior = "doorOpen"
-		case elevator.MOVING:
+		case elevator.ElevatorBehaviour(2):
 			behavior = "moving"
 		default:
 			behavior = "unknown"
 		}
 
-		hraStates[fmt.Sprintf("%d", elevator.Id)] = HRAElevState{
+		hraStates[fmt.Sprintf("%d", _elevator.Id)] = HRAElevState{
 			Behavior:    behavior,
-			Floor:       elevator.Floor,
+			Floor:       _elevator.Floor,
 			Direction:   direction,
 			CabRequests: cabRequests, // Placeholder, vous pouvez ajuster selon les besoins
 		}
