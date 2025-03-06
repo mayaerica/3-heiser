@@ -29,8 +29,6 @@ func main() {
 	messageTx := make(chan messageProcessing.Message)          // Channel for transmitting "hello" messages
 	messageRx := make(chan messageProcessing.Message)          // Channel for receiving "hello" messages
 
-
-
 	//between elevators 2 and 3
 	go peers.Transmitter(15023, id, peerTxEnable)
 	go peers.Receiver(15023, peerUpdateCh)
@@ -56,6 +54,8 @@ func main() {
 	var requestChan = make(chan requests.Request, numElevators*5)
 	var dummyChan = make(chan requests.Request, numElevators*5)
 	var assignChan = make(chan requests.Request, numElevators*5)
+	dummyChan <- requests.Request{}
+	
 
 
 	time.Sleep(5 * time.Millisecond) // Allow processing time
@@ -90,7 +90,7 @@ func main() {
 	}()
 
 
-	elevio.Init("localhost:10003", eiod.N_FLOORS) //15657
+	elevio.Init("localhost:10003", elevio.N_FLOORS) //15657
 
 
 	
@@ -137,6 +137,7 @@ func main() {
 
 	}
 
+	
 
 	//send req to reqchan
 	//assignChan har request.Handeled by
@@ -147,32 +148,30 @@ func main() {
 		
 
 		case a := <-BtnEventChan:
-			//fmt.Printf("%+vfor{\n", a)
-			elevio.SetButtonLamp(a.Button, a.Floor, true)
 			
-			if master {
-				requestChan <-requests.Request{a,0}
-			}
-
-
-			fsm.Elevator.Requests[a.Floor][a.Button] = true
-
-			fsm.OnRequestButtonPress(a.Floor, a.Button, TimerStartChan)
-			
-			//fmt.Println("button set")
-			//fsm.Elevator.Requests[a.Floor][a.Button] = true
-			//fmt.Println("request in queue")
-			//fmt.Println(fsm.Elevator.Requests)
-			//fsm.OnRequestButtonPress(a.Floor, a.Button, TimerStartChan)
-			//fmt.Println(fsm.Elevator.Behaviour)
-	/*	
-		case a :=<- assignChan:
-			if a.HandledBy == fsm.Elevator.Id {
+			//Handles local hall calls. RM handles hallcalls from other elevators
+			if a.Button != elevio.BT_Cab {
+				if !fsm.Elevator.HallCalls[a.Floor][a.Button] { //Checks if request already been called
+					requestChan <- requests.Request{
+						FloorButton: elevio.ButtonEvent{Button: elevio.ButtonType(a.Button), Floor:  a.Floor},
+						HandledBy: -1,
+					}
+					fsm.Elevator.HallCalls[a.Floor][a.Button] = true
+					elevio.SetButtonLamp(a.Button, a.Floor, true) //sets local lights for local cabin calls
+				}
 				
 			} else {
-				msg.Requests=append(msg.Requests, a)
-			}
-			*/
+
+				elevio.SetButtonLamp(a.Button, a.Floor, true)
+				fsm.Elevator.Requests[a.Floor][a.Button] = true //CabinRequests are always handled locally
+				}
+				//Sends local request to requestChan
+
+		// moves elevator
+		//	fsm.Elevator.Requests[a.Floor][a.Button] = true
+		//	fsm.OnRequestButtonPress(a.Floor, a.Button, TimerStartChan)
+			
+
 		
 		case a := <-FloorChan:
 			//fmt.Printf("floor %+v\n", a)
@@ -202,9 +201,9 @@ func main() {
 
 		case a := <-StopChan:
 			fmt.Printf("%+v\n", a)
-			for f := 0; f < eiod.N_FLOORS; f++ {
+			for f := 0; f < elevator.N_FLOORS; f++ {
 				for b := elevio.ButtonType(0); b < 3; b++ {
-					elevio.SetButtonLamp(b, f, false)
+					elevio.SetButtonLamp(b, f, false) 
 				}
 			}
 
@@ -213,14 +212,14 @@ func main() {
 			fsm.OnDoorTimeout(TimerStartChan)
 
 		case a := <-messageRx:
-			rm.UpdateElevatorsandRequests(a, dummyChan) // Put a dummychan here cause the recieveChan currently interferes with an elevator working alone. This can probably be removed later
-		
+			resource.UpdateElevatorHallCallsAndButtonLamp(a, requestChan) 
 
 		case <-ticker.C:
-			rm.PrintElevators()
+			resource.PrintElevators()
 
 		
 
 		}
 	}
 }
+

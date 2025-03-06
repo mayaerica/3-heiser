@@ -12,18 +12,10 @@ type DirnBehaviourPair struct {
 	Behaviour elevator.ElevatorBehaviour
 }
 
-
-///LORIES REQUEST
 type Request struct {
 	FloorButton elevio.ButtonEvent
 	HandledBy int
 }
-
-
-//func ChooseDirection(e elevator.Elevator) DirnBehaviourPair
-//func requestShouldStop(e elevator.Elevator) bool
-//func request_shouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevator.Button) bool
-//func request_ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator
 
 //------------------------------------------------------------------------
 
@@ -164,25 +156,36 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 		case elevio.MD_Up:
 			if !requestsAbove(e) && !e.Requests[e.Floor][elevio.BT_HallUp] {
 				e.Requests[e.Floor][elevio.BT_HallDown] = false
+				e.HallCalls[e.Floor][elevio.BT_HallDown] = false
+				e.Done[e.Floor][elevio.BT_HallDown] = true
 			}
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			e.Done[e.Floor][elevio.BT_HallUp] = true
 
 		case elevio.MD_Down:
 			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.BT_HallDown] {
 				e.Requests[e.Floor][elevio.BT_HallUp] = false
+				e.HallCalls[e.Floor][elevio.BT_HallUp] = false
+				e.Done[e.Floor][elevio.BT_HallUp] = true
 			}
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
+			e.Done[e.Floor][elevio.BT_HallDown] = true
 
 		case elevio.MD_Stop:
 			fallthrough //fallthrough means that the code will continue to the next case
 		default:
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
+
+			//Was unsure wether this should be here, but I think it makes sense
+			e.Done[e.Floor][elevio.BT_HallUp] = true
+			e.Done[e.Floor][elevio.BT_HallDown] = true
+
 		}
 	default:
+		//do nothing
 	}
 
 	return e
 }
-
-

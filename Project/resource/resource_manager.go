@@ -40,7 +40,7 @@ func PrintElevators() {
 		fmt.Println("  Button Requests: ")
 		// Here we're assuming there's a 'Requests' field in the elevator
 		// Adjust this based on your actual implementation if necessary
-		for _, btnReq := range elevator.Requests {
+		for _, btnReq := range elevator.HallCalls {
 			fmt.Printf("    Button %v\n", btnReq)
 		}
 
@@ -110,7 +110,7 @@ func ProcessElevatorRequests(input HRAInput) (map[string][][2]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json.Unmarshal error: %v", err)
 	}
-
+	
 	return output, nil
 }
 
@@ -152,11 +152,11 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 		// Behaviour
 		var behavior string
 		switch _elevator.Behaviour {
-		case elevator.ElevatorBehaviour(0):
+		case elevator.IDLE:
 			behavior = "idle"
-		case elevator.ElevatorBehaviour(1):
+		case elevator.DOOR_OPEN:
 			behavior = "doorOpen"
-		case elevator.ElevatorBehaviour(2):
+		case elevator.MOVING:
 			behavior = "moving"
 		default:
 			behavior = "unknown"
@@ -177,34 +177,55 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 	}
 }
 
-func UpdateElevatorsandRequests(msg messageProcessing.Message, requestChan chan requests.Request) {
+func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request)  {
 	id := msg.Elevator.Id
-	if id != fsm.Elevator.Id {
+	if id != fsm.Elevator.Id{
 		elevators[id-8081] = msg.Elevator
 	}
-
+	
 	for floor := 0; floor < 4; floor++ { //floor and button might need to be uiversilizersdfds if other amount of floors and button
-		for button := 0; button < 3; button++ {
+		for button := 0; button < 2; button++ {
 			// Only send request if the value is true
-			if msg.Elevator.Requests[floor][button] { // Check if there is a request for this button on the floor
-				// Create a Request and send it to the channel
+			if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button]{ //Check if request at floor and request not alreadu accounted for
+				//sets HallCall to true
+				fsm.Elevator.HallCalls[floor][button] = true
+				elevio.SetButtonLamp(elevio.ButtonType(button), floor, true) //sets hallcall light
 
+				// Sends requests from other elevators to requestchan and lights up button
 				requestChan <- requests.Request{
-					FloorButton: elevio.ButtonEvent{Button: elevio.ButtonType(button), Floor: floor},
-					HandledBy:   -1,
-				}
+					FloorButton: elevio.ButtonEvent{Button: elevio.ButtonType(button), Floor:  floor},
+					HandledBy: -1,
+					} 
+			
+			//removes HallCall if request is done
+			} else if msg.Elevator.Done[floor][button] {
+				fsm.Elevator.HallCalls[floor][button] = false
+				elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+
+			}
+
+			//toggles own Done if all elevators have removed HallCall
+			if fsm.Elevator.Done[floor][button] && !elevators[0].HallCalls[floor][button] && !elevators[1].HallCalls[floor][button] && !elevators[2].HallCalls[floor][button] {
+				fsm.Elevator.Done[floor][button] = false
 			}
 		}
-	}
 
+
+
+	
+	}
+	//updates elevators with self
 	elevators[fsm.Elevator.Id-8081] = fsm.Elevator
 
 }
 
+
 func ResourceManager(requestChan chan requests.Request, assignChan chan requests.Request) {
 
+	
 	for {
-		input := ConvertRequestToHRAInput(elevators) //, []requests.Request{request})
+		input := ConvertRequestToHRAInput(elevators)//, []req.Request{request})
+
 
 		// Call function to process requests
 		output, err := ProcessElevatorRequests(input)
@@ -215,8 +236,10 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 
 		// Display results
 		//fmt.Println("Request attributed to :")
-		fmt.Println(output)
-		//fmt.Println()
+		
+		_ = output
+		
+		//fmt.Println(output)
 
 		// Process assignments and push requests to assignChan
 		//fmt.Println(output)

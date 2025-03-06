@@ -14,7 +14,9 @@ type Elevator struct {
 	Dirn      elevio.Dirn         // moving up, down, or emergency stop
 	Behaviour ElevatorBehaviour // idle, door open, moving
 	Requests  [4][3]bool        // Requests for each floor and direction (3 buttons per floor)
-	Busy	  bool 				//Busy, added from lories code
+	HallCalls [4][2]bool   		//Which HallButtons have been made. Used to sync all elevators
+	Busy	  bool 				//Busy, added from lories code. Dont think we use this anymore -Magnus
+	Done [4][2]bool 			//List for done requests so that all elevators can turn off lights
 
 	DoorOpenDuration time.Duration
 	ClearRequestVariant ClearRequestVariant

@@ -1,10 +1,5 @@
 package fsm
 
-/*el "Driver-go/elevator"
-eleviod "Driver-go/elevator_io_device"
-elevio "Driver-go/elevio"
-req "Driver-go/requests"*/
-//timer "Driver-go/timer"
 import (
 	"elevatorlab/elevator"
 	"elevatorlab/elevio"
@@ -13,26 +8,21 @@ import (
 	"time"
 )
 
-//----------------------- h fil -----------------------
-
-// ----------------- FSM struct -----------------
-
 var Elevator elevator.Elevator
 
-//var F = FSM{Elevator: elevator.Elevator{Floor: 1, DoorsOpen: false}}
-
-//func GetFSM() *FSM {
-//    return &globalFSM
-//}
-
-// ---------------------------------------
 func setAllLights(e elevator.Elevator) {
 	for floor := 0; floor < elevator.N_FLOORS; floor++ {
 		for btn := 0; btn < elevator.N_BUTTONS; btn++ {
-			elevio.SetButtonLamp(elevio.ButtonType(btn), floor, elevio.ToBool(elevio.ToByte(e.Requests[floor][btn])))
+			Button := elevio.ButtonType(btn)
+			if Button == elevio.BT_Cab{ //Sets hall button based on HallCalls 
+				elevio.SetButtonLamp(Button, floor, elevio.ToBool(elevio.ToByte(e.Requests[floor][btn])))
+			} else { //Sets cab button based on requests
+				elevio.SetButtonLamp(Button, floor, elevio.ToBool(elevio.ToByte(e.HallCalls[floor][btn])))
+			}
+			
 		}
 	}
-}
+} 
 
 //func OnInitBetweenFloors() {
 //	elevio.SetMotorDirection(elevio.MD_Down)
