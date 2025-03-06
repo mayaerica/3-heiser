@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"strconv" //convert int to string
+	"time"
 )
 
 var ButtonRequestList [4][2]requests.Request
@@ -124,13 +126,16 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 	for _, _elevator := range elevators {
 
 		// Floor requests for the elevator
+
 		requests := _elevator.Requests
+		hallCalls := _elevator.HallCalls
+
 
 		// Iterate through the rows of the Requests matrix (floor requests)
 		for i := 0; i < len(requests); i++ {
 			// Accumulate the hall requests (external floor button presses)
-			hallRequests[i][0] = hallRequests[i][0] || requests[i][0] // OR the "up" request
-			hallRequests[i][1] = hallRequests[i][1] || requests[i][1] // OR the "down" request
+			hallRequests[i][0] = hallRequests[i][0] || hallCalls[i][0] // OR the "up" request
+			hallRequests[i][1] = hallRequests[i][1] || hallCalls[i][1] // OR the "down" request
 
 			// Accumulate the cab requests (internal elevator button presses)
 			cabRequests[i] = cabRequests[i] || requests[i][2] // OR the "cab" request (internal elevator button)
@@ -220,7 +225,7 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 }
 
 
-func ResourceManager(requestChan chan requests.Request, assignChan chan requests.Request) {
+func ResourceManager(requestChan chan requests.Request, assignChan chan requests.Request, TimerStartChan chan time.Duration) {
 
 	
 	for {
@@ -238,6 +243,23 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 		//fmt.Println("Request attributed to :")
 		
 		_ = output
+
+		
+
+		//Copies requests from output to elevator requests:
+		for floor := 0; floor < 4; floor++ {
+			for btn := 0; btn < 2; btn++ {
+				
+				if output[strconv.Itoa(fsm.Elevator.Id)][floor][btn] && !fsm.Elevator.Requests[floor][btn]{
+					fsm.Elevator.Requests[floor][btn] = output[strconv.Itoa(fsm.Elevator.Id)][floor][btn]
+					fsm.Elevator.Requests[floor][btn] = true
+					fsm.OnRequestButtonPress(floor, elevio.ButtonType(btn), TimerStartChan)
+				}
+				
+			}
+			 
+		}
+	}
 		
 		//fmt.Println(output)
 
@@ -249,7 +271,5 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 					assignChan <- reqPair
 				}
 			}*/
-
-	}
 
 }

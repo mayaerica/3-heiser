@@ -6,7 +6,6 @@ import (
 	
 )
 
-// ---------------------------------h.file---------------------------------
 type DirnBehaviourPair struct {
 	Dirn      elevio.Dirn
 	Behaviour elevator.ElevatorBehaviour
@@ -16,8 +15,6 @@ type Request struct {
 	FloorButton elevio.ButtonEvent
 	HandledBy int
 }
-
-//------------------------------------------------------------------------
 
 func requestsAbove(e elevator.Elevator) bool {
 	for f := e.Floor + 1; f < elevator.N_FLOORS; f++ {
@@ -49,6 +46,7 @@ func requestsHere(e elevator.Elevator) bool {
 	}
 	return false
 }
+
 
 func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 
@@ -144,6 +142,8 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
+
+
 func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
@@ -160,6 +160,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 				e.Done[e.Floor][elevio.BT_HallDown] = true
 			}
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
 			e.Done[e.Floor][elevio.BT_HallUp] = true
 
 		case elevio.MD_Down:
@@ -179,6 +180,8 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
 
 			//Was unsure wether this should be here, but I think it makes sense
+			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
+			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
 			e.Done[e.Floor][elevio.BT_HallUp] = true
 			e.Done[e.Floor][elevio.BT_HallDown] = true
 

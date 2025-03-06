@@ -17,9 +17,9 @@ var _conn           net.Conn
 type Dirn int
 
 const (
-	MD_Up   Dirn = 1
-	MD_Down                = -1
-	MD_Stop                = 0
+	MD_Up    Dirn = 1
+	MD_Down       = -1
+	MD_Stop       = 0
 )
 
 type ButtonType int

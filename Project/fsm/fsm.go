@@ -30,6 +30,7 @@ func setAllLights(e elevator.Elevator) {
 //	Elevator.Behaviour = elevator.MOVING
 //}
 
+
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
 
 	switch Elevator.Behaviour {

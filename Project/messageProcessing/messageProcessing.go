@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-
 var printMessageCounter = 0
 
 

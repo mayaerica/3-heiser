@@ -9,7 +9,7 @@ const N_FLOORS int = 4
 const N_BUTTONS int = 3
 
 type Elevator struct {
-	Id        int 		//busy, added from lories code
+	Id        int 		
 	Floor     int
 	Dirn      elevio.Dirn         // moving up, down, or emergency stop
 	Behaviour ElevatorBehaviour // idle, door open, moving
@@ -26,9 +26,9 @@ type Elevator struct {
 
 type ElevatorBehaviour int
 const (
-	IDLE     ElevatorBehaviour = 0
-	DOOR_OPEN = 1
-	MOVING    = 2
+	IDLE       ElevatorBehaviour = 0
+	DOOR_OPEN 				     = 1
+	MOVING                       = 2
 )
 
 

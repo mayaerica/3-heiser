@@ -74,6 +74,11 @@ func main() {
 
 
 
+	//turns off all lights
+	
+
+
+
 	go func() {
 		for {
 			msg := messageProcessing.Message{
@@ -90,7 +95,7 @@ func main() {
 	}()
 
 
-	elevio.Init("localhost:15657", elevator.N_FLOORS) //15657
+	elevio.Init("localhost:15657", elevio.N_FLOORS) //15657
 
 
 	
@@ -110,34 +115,38 @@ func main() {
 	maintimer := time.NewTimer(time.Duration(fsm.Elevator.DoorOpenDuration))
 	maintimer.Stop()
 	
-	go resource.ResourceManager(requestChan, assignChan)
+	go resource.ResourceManager(requestChan, assignChan, TimerStartChan)
 	
-	
+
+	//Sets motorDirection down if not on first floor before initialization
+	init := true
+	for elevio.GetFloor() != 0 && init{
+		elevio.SetMotorDirection(-1)
+		elevio.SetFloorIndicator(0)
+	}
+	init = false
+	elevio.SetMotorDirection(0)
+
 	go elevio.PollButtons(BtnEventChan)
 	go elevio.PollFloorSensor(FloorChan)
 	go elevio.PollObstructionSwitch(ObstructionChan)
 	go elevio.PollStopButton(StopChan)
 	go timer.Start(maintimer, TimerStartChan)
-	x := <-FloorChan
 	
 	ticker := time.NewTicker(UpdateIntervall) // Adjust time as needed
 	defer ticker.Stop()
 
-	/*if x == -1 {
-	    x = <-drv_floors
-	    elevio.SetMotorDirection(1)
-	    fmt.Printf("x=-1")
-	}*/
-
-	if x != -1 {
-		elevio.SetMotorDirection(0)
-		elevio.SetFloorIndicator(x)
-		fsm.Elevator.Behaviour = elevator.IDLE //REMOVE THIS
-		fsm.Elevator.Floor = x
-
-	}
-
 	
+
+
+	//turns off all lights
+	for floor := 0; floor < elevator.N_FLOORS; floor++ {
+		for btn := 0; btn < elevator.N_BUTTONS; btn++ {
+			Button := elevio.ButtonType(btn)
+				elevio.SetButtonLamp(Button, floor, false)
+			
+		}
+	}
 
 	//send req to reqchan
 	//assignChan har request.Handeled by
