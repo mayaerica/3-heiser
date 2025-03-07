@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"strconv" //convert int to string
+	"strconv" 
 	"time"
 )
 
@@ -69,7 +69,7 @@ type HRAElevState struct {
 	Behavior    string `json:"behaviour"`
 	Floor       int    `json:"floor"`
 	Direction   string `json:"direction"`
-	CabRequests []bool `json:"cabRequests"` // if an el has request for at a floor
+	CabRequests []bool `json:"cabRequests"` 
 }
 
 // State of the system
@@ -112,7 +112,6 @@ func ProcessElevatorRequests(input HRAInput) (map[string][][2]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json.Unmarshal error: %v", err)
 	}
-	
 	return output, nil
 }
 
@@ -124,12 +123,9 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 	// Iterate through the rows of the Requests matrix (floor requests)
 	for _, _elevator := range elevators {
-
 		// Floor requests for the elevator
-
 		requests := _elevator.Requests
 		hallCalls := _elevator.HallCalls
-
 
 		// Iterate through the rows of the Requests matrix (floor requests)
 		for i := 0; i < len(requests); i++ {
@@ -171,9 +167,8 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 			Behavior:    behavior,
 			Floor:       _elevator.Floor,
 			Direction:   direction,
-			CabRequests: cabRequests, // Placeholder, vous pouvez ajuster selon les besoins
+			CabRequests: cabRequests, // Placeholder
 		}
-
 	}
 
 	return HRAInput{
@@ -188,11 +183,11 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 		elevators[id-8081] = msg.Elevator
 	}
 	
-	for floor := 0; floor < 4; floor++ { //floor and button might need to be uiversilizersdfds if other amount of floors and button
+	for floor := 0; floor < 4; floor++ { 
 		for button := 0; button < 2; button++ {
 			// Only send request if the value is true
-			if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button]{ //Check if request at floor and request not alreadu accounted for
-				//sets HallCall to true
+			if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button]{ 
+				//Check if request at floor and request not alreadu accounted for
 				fsm.Elevator.HallCalls[floor][button] = true
 				elevio.SetButtonLamp(elevio.ButtonType(button), floor, true) //sets hallcall light
 
@@ -206,7 +201,6 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 			} else if msg.Elevator.Done[floor][button] {
 				fsm.Elevator.HallCalls[floor][button] = false
 				elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-
 			}
 
 			//toggles own Done if all elevators have removed HallCall
@@ -214,62 +208,32 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 				fsm.Elevator.Done[floor][button] = false
 			}
 		}
-
-
-
-	
 	}
 	//updates elevators with self
 	elevators[fsm.Elevator.Id-8081] = fsm.Elevator
-
 }
 
 
 func ResourceManager(requestChan chan requests.Request, assignChan chan requests.Request, TimerStartChan chan time.Duration) {
-
-	
 	for {
-		input := ConvertRequestToHRAInput(elevators)//, []req.Request{request})
-
+		input := ConvertRequestToHRAInput(elevators)
 
 		// Call function to process requests
 		output, err := ProcessElevatorRequests(input)
 		if err != nil {
-			fmt.Println("Erreur :", err)
+			fmt.Println("Error :", err)
 			return
 		}
-
-		// Display results
-		//fmt.Println("Request attributed to :")
-		
-		_ = output
-
-		
 
 		//Copies requests from output to elevator requests:
 		for floor := 0; floor < 4; floor++ {
 			for btn := 0; btn < 2; btn++ {
-				
 				if output[strconv.Itoa(fsm.Elevator.Id)][floor][btn] && !fsm.Elevator.Requests[floor][btn]{
 					fsm.Elevator.Requests[floor][btn] = output[strconv.Itoa(fsm.Elevator.Id)][floor][btn]
 					fsm.Elevator.Requests[floor][btn] = true
 					fsm.OnRequestButtonPress(floor, elevio.ButtonType(btn), TimerStartChan)
 				}
-				
-			}
-			 
+			} 
 		}
 	}
-		
-		//fmt.Println(output)
-
-		// Process assignments and push requests to assignChan
-		//fmt.Println(output)
-		/*
-			for _, req := range output {
-				for _, reqPair := range req {
-					assignChan <- reqPair
-				}
-			}*/
-
 }

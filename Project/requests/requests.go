@@ -3,7 +3,6 @@ package requests
 import (
 	"elevatorlab/elevator"
 	"elevatorlab/elevio"
-	
 )
 
 type DirnBehaviourPair struct {
@@ -13,7 +12,7 @@ type DirnBehaviourPair struct {
 
 type Request struct {
 	FloorButton elevio.ButtonEvent
-	HandledBy int
+	HandledBy   int
 }
 
 func requestsAbove(e elevator.Elevator) bool {
@@ -40,20 +39,16 @@ func requestsBelow(e elevator.Elevator) bool {
 
 func requestsHere(e elevator.Elevator) bool {
 	for btn := 0; btn < elevator.N_BUTTONS; btn++ {
-		if e.Requests[e.Floor][btn] {type Dirn int
+		if e.Requests[e.Floor][btn] {
 			return true
 		}
 	}
 	return false
 }
 
-
 func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
-
 	switch e.Dirn {
-
 	case elevio.MD_Up:
-
 		if requestsAbove(e) {
 			return DirnBehaviourPair{elevio.MD_Up, elevator.MOVING}
 		}
@@ -63,11 +58,9 @@ func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 		if requestsBelow(e) {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
 		}
-
 		return DirnBehaviourPair{elevio.MD_Stop, elevator.IDLE}
 
 	case elevio.MD_Down:
-
 		if requestsBelow(e) {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
 		}
@@ -77,11 +70,9 @@ func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 		if requestsAbove(e) {
 			return DirnBehaviourPair{elevio.MD_Up, elevator.MOVING}
 		}
-
 		return DirnBehaviourPair{elevio.MD_Stop, elevator.IDLE}
 
 	case elevio.MD_Stop:
-
 		if requestsHere(e) {
 			return DirnBehaviourPair{elevio.MD_Stop, elevator.DOOR_OPEN}
 		}
@@ -91,7 +82,6 @@ func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 		if requestsBelow(e) {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
 		}
-
 		return DirnBehaviourPair{elevio.MD_Stop, elevator.IDLE}
 
 	default:
@@ -102,9 +92,7 @@ func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 
 func RequestShouldStop(e elevator.Elevator) bool {
 	switch e.Dirn {
-
 	case elevio.MD_Down:
-
 		return e.Requests[e.Floor][elevio.BT_HallDown] ||
 			e.Requests[e.Floor][elevio.BT_Cab] ||
 			!requestsBelow(e)
@@ -124,9 +112,6 @@ func RequestShouldStop(e elevator.Elevator) bool {
 
 func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.ButtonType) bool {
 	switch e.ClearRequestVariant {
-	//CV stands for Clear Variant
-	//CV_All: clear all requests at a specific floor regardless of direction?
-	//CV_InDirn: clear requests in the direction of the elevator
 	case elevator.CV_All:
 		return e.Floor == btnFloor
 
@@ -141,8 +126,6 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 		return false
 	}
 }
-
-
 
 func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 	switch e.ClearRequestVariant {
@@ -174,12 +157,11 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			e.Done[e.Floor][elevio.BT_HallDown] = true
 
 		case elevio.MD_Stop:
-			fallthrough //fallthrough means that the code will continue to the next case
+			fallthrough
 		default:
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
 
-			//Was unsure wether this should be here, but I think it makes sense
 			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
 			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
 			e.Done[e.Floor][elevio.BT_HallUp] = true
@@ -187,8 +169,6 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 
 		}
 	default:
-		//do nothing
 	}
-
 	return e
 }
