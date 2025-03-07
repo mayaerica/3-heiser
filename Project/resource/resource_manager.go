@@ -22,42 +22,20 @@ var elevators = []elevator.Elevator{
 	{Id: 8083, Floor: 0, Dirn: elevio.Dirn(0), Behaviour: elevator.ElevatorBehaviour(0), Busy: false, DoorOpenDuration: 0, ClearRequestVariant: 1}, // Elevator 8083
 }
 
-var printElevatorCounter int
+//var printElevatorCounter int
 
 // Function to print elevator information in a similar format as PrintLastReceivedMessages
 func PrintElevators() {
-	fmt.Println("############################", printElevatorCounter, "##################################")
-	fmt.Println("Elevator Information:")
-
-	// Iterate through the elevators array and print details
 	for _, elevator := range elevators {
-		// Print elevator ID and active status
-		fmt.Printf("Elevator ID: %-5d", elevator.Id)
-
-		// Print the entire Elevator struct for the current elevator
-		fmt.Printf("  Floor: %-3d | Direction: %-8s | Behaviour: %-8s | Busy: %-5t | DoorOpenDuration: %-4v | ClearRequestVariant: %-5v\n",
-			elevator.Floor, elevator.Dirn, elevator.Behaviour, elevator.Busy, elevator.DoorOpenDuration, elevator.ClearRequestVariant)
-
-		// Print the button requests (assuming this is a list of button presses)
-		fmt.Println("  Button Requests: ")
-		// Here we're assuming there's a 'Requests' field in the elevator
-		// Adjust this based on your actual implementation if necessary
-		for _, btnReq := range elevator.HallCalls {
-			fmt.Printf("    Button %v\n", btnReq)
+		message := messageProcessing.Message{
+			Elevator: elevator,
+			Active1: messageProcessing.ElevatorStatus[8081],
+			Active2: messageProcessing.ElevatorStatus[8082],
+			Active3: messageProcessing.ElevatorStatus[8083],
+			//Requests: elevator.Requests,
 		}
-
-		// Print requests for the elevator
-		fmt.Println("  Requests: ")
-		for i := 0; i < len(elevator.Requests); i++ {
-			fmt.Printf("    Floor %d: %v\n", i+1, elevator.Requests[i])
-		}
-
-		// Add a separator line for each elevator
-		fmt.Println("#################################################################")
+		messageProcessing.PrintLastReceivedMessages(message)
 	}
-
-	// Increment the elevator counter
-	printElevatorCounter++
 }
 
 // Struct members must be public in order to be accessible by json.Marshal/.Unmarshal

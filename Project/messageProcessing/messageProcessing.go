@@ -9,7 +9,7 @@ import (
 var printMessageCounter = 0
 
 //store last received messages & timestamps
-var elevatorStatus = map[int]bool{
+var ElevatorStatus = map[int]bool{
 	8081: true, // Elevator 1 initially active
 	8082: true, // Elevator 2 initially active
 	8083: true, // Elevator 3 initially active
