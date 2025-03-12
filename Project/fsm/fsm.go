@@ -73,18 +73,11 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration) {
 	switch Elevator.Behaviour {
 	case elevator.MOVING:
 		if requests.RequestShouldStop(Elevator) {
-			fmt.Println("0")
 			elevio.SetMotorDirection(elevio.MD_Stop) 
-			fmt.Println("1")
-			elevio.SetDoorOpenLamp(true)         
-			fmt.Println("2")    
+			elevio.SetDoorOpenLamp(true)
 			Elevator = requests.ClearAtCurrentFloor(Elevator)
-			fmt.Println("3")
-			fmt.Println("timer",Elevator.DoorOpenDuration )
 			timer_start <- Elevator.DoorOpenDuration 
-			fmt.Println("4")
 			setAllLights(Elevator)
-			fmt.Println("5")
 			Elevator.Behaviour = elevator.DOOR_OPEN
 		}
 	default:
@@ -95,8 +88,8 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration) {
 func OnDoorTimeout(timer_start chan time.Duration) {
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
-		if elevio.GetObstruction() == true {
-			fmt.Println("obstruction")         //this is the wrong solution :)
+		if elevio.GetObstruction() {
+			fmt.Println("obstruction")  //fix     
 			break
 		}
 

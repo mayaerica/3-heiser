@@ -19,7 +19,12 @@ import (
 
 )
 
-var UpdateInterval = 1000 * time.Millisecond
+
+/*
+Hanled by, requests, done and hallcalls are handled twice. Once by resourcemanager and once by UpdateElevatorHallCallsAndButtonLamp. 
+This should be fixed so that only one of them needs to set a value false when needed.
+*/
+var UpdateInterval = 200 * time.Millisecond
 
 const (
 	numElevators = 3
@@ -37,7 +42,7 @@ func main() {
 		fmt.Println("Error getting local IP:", err)
 		os.Exit(1)
 	}
-	fmt.Println("Elevator %s running on IP:", *id, localIP)
+	fmt.Printf("Elevator %s running on IP: %s\n", *id, localIP)
 
 	elevatorID, err:= strconv.Atoi(*id)
 	if err != nil {
@@ -84,6 +89,7 @@ func main() {
 	fsm.Elevator.Behaviour = elevator.IDLE
 	fsm.Elevator.Dirn = elevio.MD_Stop
 	fsm.Elevator.Id = elevatorID
+	messageProcessing.ElevatorStatus[strconv.Itoa(elevatorID)]=true
 
 	maintimer := time.NewTimer(time.Duration(fsm.Elevator.DoorOpenDuration))
 	maintimer.Stop()
@@ -110,20 +116,8 @@ func main() {
 
 
 	//continously updating messages:
-	go func() {
-		for {
-			msg := messageProcessing.Message{
-				Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
-				Active1:       true, 
-				Active2:       true,
-				Active3:       true,
-				Requests: make([]requests.Request, 0), // Initialize an empty slice for ButtonRequests
-			}
-			messageTx <- msg
+	go messageProcessing.UpdateMessage(peerUpdateCh, messageTx)
 
-			time.Sleep(10 * time.Millisecond)
-		}
-	}()
 
 	//event loop
 	for {
@@ -143,12 +137,11 @@ func main() {
 		case floor := <-FloorChan:
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
-				fmt.Println("fem")
 				fsm.OnFloorArrival(floor, TimerStartChan)
 			}
 
 		case obstructed := <-ObstuctionChan:
-			if obstructed && fsm.Elevator.Behaviour == elevator.DOOR_OPEN {
+			if obstructed && fsm.Elevator.Behaviour == elevator.DOOR_OPEN { 
 				TimerStartChan <- time.Duration(1<<63 - 1)	
 			} else{
 				TimerStartChan <- fsm.Elevator.DoorOpenDuration
@@ -159,14 +152,22 @@ func main() {
 					elevio.SetButtonLamp(b, f, false)
 				}
 			}
-			elevio.SetMotorDirection(elevio.MD_Stop)
-			fmt.Println("emergency stop activated!")
+
+		
+		case <-maintimer.C:
+			fsm.OnDoorTimeout(TimerStartChan)
+
 		
 		case <-ticker.C:
+			//fmt.Println("6")
 			resource.PrintElevators()
+	
 
 		case msg := <-messageRx:
-			resource.UpdateElevatorHallCallsAndButtonLamp(msg, requestChan)
+			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
+			resource.UpdateElevatorHallCallsAndButtonLamp(msg, requestChan, TimerStartChan)
+
+		
 		}
 	}
 }

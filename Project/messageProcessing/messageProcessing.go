@@ -2,32 +2,36 @@ package messageProcessing
 
 import (
 	"elevatorlab/elevator"
-	"elevatorlab/requests"
+    "elevatorlab/fsm"
+	//"elevatorlab/requests"
+    "time"
+	"elevatorlab/network/peers"
 	"fmt"
+    "sync"
 )
+
 
 var printMessageCounter = 0
 
+var Mu2 sync.Mutex // used to lock ElevatorStatus
+
 //store last received messages & timestamps
-var ElevatorStatus = map[int]bool{
-	8081: true, // Elevator 1 initially active
-	8082: true, // Elevator 2 initially active
-	8083: true, // Elevator 3 initially active
+var ElevatorStatus = map[string]bool{
+	"8081": false, // Elevator 1 initially active
+	"8082": false, // Elevator 2 initially active
+	"8083": false, // Elevator 3 initially active
 }
+
 
 type Message struct {
     Elevator      elevator.Elevator      // Elevator field
     Active1       bool             // Is Elevator 1 active?
     Active2       bool             // Is Elevator 2 active?
     Active3       bool             // Is Elevator 3 active?
-    Requests [] requests.Request // List of button requests
 }
 
 //print the last received messages
 func PrintLastReceivedMessages(message Message) {
-    fmt.Println("############################", printMessageCounter, "##################################")
-    fmt.Println("Last Received Messages:")
-
     // Print elevator ID and active status for each elevator
     fmt.Printf("Elevator ID: %-5d", message.Elevator.Id)
 
@@ -48,9 +52,41 @@ func PrintLastReceivedMessages(message Message) {
         fmt.Printf("    Floor %d: %v\n", i+1, message.Elevator.Requests[i])
         }
 
-    // Print the closing line for separation
-    fmt.Println("#################################################################")
+    fmt.Println("  Done: ")
+    for i := 0; i < len(message.Elevator.Requests); i++ {
+         fmt.Printf("    Floor %d: %v\n", i+1, message.Elevator.Done[i])
+        }
 
-    // Increment the message counter
-    printMessageCounter++
+}
+
+
+func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message){
+    for{
+        select {
+            case p :=<-peerUpdateCh:
+
+            for elevator := range p.Lost {
+                Mu2.Lock()
+                ElevatorStatus[p.Lost[elevator]]=false
+                Mu2.Unlock()
+            }
+
+            if len (p.New)!=0{
+                Mu2.Lock()
+                ElevatorStatus[p.New]=true
+                Mu2.Unlock()
+            }
+
+            default:
+                
+                msg := Message{
+                    Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
+                    Active1:       ElevatorStatus["8081"], 
+                    Active2:       ElevatorStatus["8082"],
+                    Active3:       ElevatorStatus["8083"],
+                }
+                messageTx <- msg
+                time.Sleep(10 * time.Millisecond)
+            }
+        }
 }

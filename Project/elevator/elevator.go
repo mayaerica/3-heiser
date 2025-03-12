@@ -4,7 +4,26 @@ import (
 	"elevatorlab/elevio"
 	"time"
 )
+// Elevator's states
 
+type ElevatorBehaviour int
+const (
+	IDLE       ElevatorBehaviour = iota
+	DOOR_OPEN 				    
+	MOVING                       
+)
+func(e ElevatorBehaviour) String() string {
+	switch e {
+	case IDLE:
+		return "IDLE"
+	case DOOR_OPEN:
+		return "DOOR_OPEN"
+	case MOVING:
+		return "MOVING"
+	default:
+		return "Unknown"
+	}
+}
 const N_FLOORS int = 4
 const N_BUTTONS int = 3
 
@@ -17,19 +36,13 @@ type Elevator struct {
 	HallCalls [4][2]bool   		//Which HallButtons have been made. Used to sync all elevators
 	Busy	  bool 				//Busy, added from lories code. Dont think we use this anymore -Magnus
 	Done [4][2]bool 			//List for done requests so that all elevators can turn off lights
+	HandledBy [4][2]string	     //used to check if two elevators agree which should handle the call
 
 	DoorOpenDuration time.Duration
 	ClearRequestVariant ClearRequestVariant
 }
 
-// Elevator's states
 
-type ElevatorBehaviour int
-const (
-	IDLE       ElevatorBehaviour = 0
-	DOOR_OPEN 				     = 1
-	MOVING                       = 2
-)
 
 
 // Checks if the elevator should stop at the given floor based on requests.

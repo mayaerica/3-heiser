@@ -22,21 +22,40 @@ var elevators = []elevator.Elevator{
 	{Id: 8083, Floor: 0, Dirn: elevio.Dirn(0), Behaviour: elevator.ElevatorBehaviour(0), Busy: false, DoorOpenDuration: 0, ClearRequestVariant: 1}, // Elevator 8083
 }
 
-//var printElevatorCounter int
+var printElevatorCounter int
 
 // Function to print elevator information in a similar format as PrintLastReceivedMessages
 func PrintElevators() {
-	for _, elevator := range elevators {
-		message := messageProcessing.Message{
-			Elevator: elevator,
-			Active1: messageProcessing.ElevatorStatus[8081],
-			Active2: messageProcessing.ElevatorStatus[8082],
-			Active3: messageProcessing.ElevatorStatus[8083],
-			//Requests: elevator.Requests,
-		}
-		messageProcessing.PrintLastReceivedMessages(message)
-	}
+    fmt.Println("############################", printElevatorCounter, "##################################")
+    fmt.Println("Elevator Information:")
+
+    // Iterate through the elevators array and print details
+    for _, elevator := range elevators {
+        if elevator.Id == fsm.Elevator.Id {
+            elevators[elevator.Id-8081] = fsm.Elevator
+        }
+
+        // Print elevator ID, floor, direction, behaviour, busy status, door open duration, clear request variant in a row
+		fmt.Printf("Elevator ID: %-5d | Floor: %-3d | Direction: %-8s | Behaviour: %-8s | Busy: %-5t | DoorOpenDuration: %-4v | ClearRequestVariant: %-5v\n",
+			elevator.Id, elevator.Floor, elevator.Dirn.String(), elevator.Behaviour.String(), elevator.Busy, elevator.DoorOpenDuration, elevator.ClearRequestVariant)
+
+        // Print the floor number headers for each category, now including Handled
+        fmt.Printf("  %-6v %-6v %-6v %-6v\n", "   Hall Calls           ", "Requests           ", "Done         ", "Handled")
+
+        // Loop through all floors and print corresponding Button Requests, Requests, Done, and Handled side by side
+        for i := 0; i < len(elevator.HallCalls); i++ {
+            fmt.Printf("    %-6v %-6v %-6v %-6v\n", elevator.HallCalls[i], elevator.Requests[i], elevator.Done[i], elevator.HandledBy[i])
+        }
+
+        // Add a separator line for each elevator
+        fmt.Println("#################################################################")
+    }
+
+    // Increment the elevator counter
+    printElevatorCounter++
 }
+
+
 
 // Struct members must be public in order to be accessible by json.Marshal/.Unmarshal
 // This means they must start with a capital letter, so we need to use field renaming struct tags to make them camelCase
@@ -155,63 +174,131 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 	}
 }
 
-func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request)  {
+func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request, TimerStartChan chan time.Duration)  {
 	id := msg.Elevator.Id
+	elevators[id-8081] = msg.Elevator
 	if id != fsm.Elevator.Id{
-		elevators[id-8081] = msg.Elevator
-	}
 	
-	for floor := 0; floor < 4; floor++ { 
-		for button := 0; button < 2; button++ {
-			// Only send request if the value is true
-			if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button]{ 
-				//Check if request at floor and request not alreadu accounted for
-				fsm.Elevator.HallCalls[floor][button] = true
-				elevio.SetButtonLamp(elevio.ButtonType(button), floor, true) //sets hallcall light
+		for floor := 0; floor < 4; floor++ { 
+			for button := 0; button < 2; button++ {
 
-				// Sends requests from other elevators to requestchan and lights up button
-				requestChan <- requests.Request{
-					FloorButton: elevio.ButtonEvent{Button: elevio.ButtonType(button), Floor:  floor},
-					HandledBy: -1,
-					} 
-			
-			//removes HallCall if request is done
-			} else if msg.Elevator.Done[floor][button] {
-				fsm.Elevator.HallCalls[floor][button] = false
-				elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-			}
+				//################Sets floor calls and removes true if all elevators have finished removing buttoncall ####################################
+				if fsm.Elevator.HandledBy[floor][button] == "Done" && !elevators[0].HallCalls[floor][button] && !elevators[1].HallCalls[floor][button] && !elevators[2].HallCalls[floor][button] {
+					requests.Mu5.Lock()
+					fsm.Elevator.HandledBy[floor][button] = ""
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+					requests.Mu5.Unlock()
+					
+				//removes hallcall if done
+				} else if msg.Elevator.HandledBy[floor][button] == "Done" {
+					requests.Mu5.Lock()
+					fsm.Elevator.HandledBy[floor][button] = ""
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+					requests.Mu5.Unlock()
 
-			//toggles own Done if all elevators have removed HallCall
-			if fsm.Elevator.Done[floor][button] && !elevators[0].HallCalls[floor][button] && !elevators[1].HallCalls[floor][button] && !elevators[2].HallCalls[floor][button] {
-				fsm.Elevator.Done[floor][button] = false
+		// Only send request if the value is true
+				}else if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] {  
+					//Check if request at floor and request not alreadu accounted for
+					fsm.Elevator.HallCalls[floor][button] = true
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, true) //sets hallcall light
+
+					// Sends requests from other elevators to requestchan and lights up button
+					requestChan <- requests.Request{
+						FloorButton: elevio.ButtonEvent{Button: elevio.ButtonType(button), Floor:  floor},
+						HandledBy: -1,
+						} 
+				
+				}
+
 			}
 		}
 	}
 	//updates elevators with self
-	elevators[fsm.Elevator.Id-8081] = fsm.Elevator
 }
 
 
 func ResourceManager(requestChan chan requests.Request, assignChan chan requests.Request, TimerStartChan chan time.Duration) {
 	for {
-		input := ConvertRequestToHRAInput(elevators)
+		// Checks if elevators are active before sending them to request
+		var activeElevators = []elevator.Elevator{}
 
-		// Call function to process requests
-		output, err := ProcessElevatorRequests(input)
-		if err != nil {
-			fmt.Println("Error :", err)
-			return
-		}
+		for _,elevator := range elevators {
+            if messageProcessing.ElevatorStatus[strconv.Itoa(elevator.Id)] {
+				messageProcessing.Mu2.Lock()
+				activeElevators = append(activeElevators,elevator)
+				messageProcessing.Mu2.Unlock()
+			}
+        }
 
-		//Copies requests from output to elevator requests:
-		for floor := 0; floor < 4; floor++ {
-			for btn := 0; btn < 2; btn++ {
-				if output[strconv.Itoa(fsm.Elevator.Id)][floor][btn] && !fsm.Elevator.Requests[floor][btn]{
-					fsm.Elevator.Requests[floor][btn] = output[strconv.Itoa(fsm.Elevator.Id)][floor][btn]
-					fsm.Elevator.Requests[floor][btn] = true
-					fsm.OnRequestButtonPress(floor, elevio.ButtonType(btn), TimerStartChan)
+
+		if len(activeElevators)!=0 {
+			
+		
+			//fmt.Println("fem", activeElevators)
+
+			input := ConvertRequestToHRAInput(activeElevators)
+
+			// Call function to process requests
+			output, err := ProcessElevatorRequests(input)
+			if err != nil {
+				fmt.Println("Error :", err)
+				return
+			}
+
+			
+			//sets request if only one elevator active
+			if len(activeElevators) == 1 {
+				for _, floorButtonStates := range output {
+
+					for floor, buttons := range floorButtonStates {
+			
+						for button, buttonState := range buttons {
+							if buttonState {
+								requests.Mu5.Lock()
+								fsm.Elevator.Requests[floor][button] = buttonState
+								fsm.OnRequestButtonPress(floor, elevio.ButtonType(button), TimerStartChan)
+								requests.Mu5.Unlock()
+
+							}
+						}
+					}
 				}
-			} 
+			} else {
+			
+				//Copies output into handled by. Handled by is check in UpdateElevatorHallCallsAndButtonLamp
+				for elevatorID, floorButtonStates := range output {
+
+					for floor, buttons := range floorButtonStates {
+			
+						for button, buttonState := range buttons {
+							if buttonState{
+								requests.Mu5.Lock()
+								fsm.Elevator.HandledBy[floor][button]=elevatorID
+								requests.Mu5.Unlock()
+							} 
+						}
+					}
+				}
+					//##################Sets requests if two elevators agree#############################
+					//Checks if two elevators agree on who should take order.
+					for _,elevator := range elevators {
+						if elevator.Id != fsm.Elevator.Id {
+							for floor := 0; floor < 4; floor++ { 
+								for button := 0; button < 2; button++ {
+									if elevator.HandledBy[floor][button] == fsm.Elevator.HandledBy[floor][button] && fsm.Elevator.HandledBy[floor][button] == strconv.Itoa(fsm.Elevator.Id) && !fsm.Elevator.Requests[floor][button] {
+										requests.Mu5.Lock()
+										fsm.Elevator.Requests[floor][button] = true
+										requests.Mu5.Unlock()
+										fsm.OnRequestButtonPress(floor, elevio.ButtonType(button), TimerStartChan)
+
+									//If an elevator is alone and gets a connection its requests should be wiped
+									} 
+								}
+							}
+						}	
+					}
+				}
+			
 		}
 	}
 }

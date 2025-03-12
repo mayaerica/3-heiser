@@ -18,16 +18,28 @@ type Dirn int
 
 const (
 	MD_Up    Dirn = 1
-	MD_Down       = -1
-	MD_Stop       = 0
+	MD_Down  Dirn = -1
+	MD_Stop  Dirn = 0
 )
 
+func (d Dirn) String() string {
+	switch d {
+	case MD_Up:
+		return "Up"
+	case MD_Down:
+		return "Down"
+	case MD_Stop:
+		return "Stop"
+	default:
+		return "Unknown"
+	}
+}
 type ButtonType int
 
 const (
-	BT_HallUp   ButtonType = 0
-	BT_HallDown            = 1
-	BT_Cab                 = 2
+	BT_HallUp   ButtonType = iota
+	BT_HallDown 
+	BT_Cab      
 )
 
 type ButtonEvent struct {
