@@ -159,6 +159,8 @@ func main() {
 					elevio.SetButtonLamp(b, f, false)
 				}
 			}
+			elevio.SetMotorDirection(elevio.MD_Stop)
+			fmt.Println("emergency stop activated!")
 		
 		case <-ticker.C:
 			resource.PrintElevators()
