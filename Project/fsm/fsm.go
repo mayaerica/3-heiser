@@ -73,11 +73,18 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration) {
 	switch Elevator.Behaviour {
 	case elevator.MOVING:
 		if requests.RequestShouldStop(Elevator) {
+			fmt.Println("0")
 			elevio.SetMotorDirection(elevio.MD_Stop) 
-			elevio.SetDoorOpenLamp(true)             
+			fmt.Println("1")
+			elevio.SetDoorOpenLamp(true)         
+			fmt.Println("2")    
 			Elevator = requests.ClearAtCurrentFloor(Elevator)
+			fmt.Println("3")
+			fmt.Println("timer",Elevator.DoorOpenDuration )
 			timer_start <- Elevator.DoorOpenDuration 
+			fmt.Println("4")
 			setAllLights(Elevator)
+			fmt.Println("5")
 			Elevator.Behaviour = elevator.DOOR_OPEN
 		}
 	default:

@@ -10,6 +10,7 @@ import (
 	"elevatorlab/network/bcast"
 	"elevatorlab/network/localip"
 	"elevatorlab/network/peers"
+	"elevatorlab/timer"
 	"fmt"
 	"os"
 	"time"
@@ -84,6 +85,9 @@ func main() {
 	fsm.Elevator.Dirn = elevio.MD_Stop
 	fsm.Elevator.Id = elevatorID
 
+	maintimer := time.NewTimer(time.Duration(fsm.Elevator.DoorOpenDuration))
+	maintimer.Stop()
+
 
 	//channels
 	requestChan := make(chan requests.Request, numElevators*5)
@@ -99,9 +103,27 @@ func main() {
 	go elevio.PollFloorSensor(FloorChan)
 	go elevio.PollObstructionSwitch(ObstuctionChan)
 	go elevio.PollStopButton(StopChan)
+	go timer.Start(maintimer, TimerStartChan)
 
 	ticker := time.NewTicker(UpdateInterval)
 	defer ticker.Stop()
+
+
+	//continously updating messages:
+	go func() {
+		for {
+			msg := messageProcessing.Message{
+				Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
+				Active1:       true, 
+				Active2:       true,
+				Active3:       true,
+				Requests: make([]requests.Request, 0), // Initialize an empty slice for ButtonRequests
+			}
+			messageTx <- msg
+
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
 
 	//event loop
 	for {
@@ -116,12 +138,15 @@ func main() {
 				} else {
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
+					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
 				}
 		case floor := <-FloorChan:
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
+				fmt.Println("fem")
 				fsm.OnFloorArrival(floor, TimerStartChan)
 			}
+
 		case obstructed := <-ObstuctionChan:
 			if obstructed && fsm.Elevator.Behaviour == elevator.DOOR_OPEN {
 				TimerStartChan <- time.Duration(1<<63 - 1)	
