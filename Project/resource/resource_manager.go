@@ -194,7 +194,7 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 					fmt.Println("\n\n\n\n\n", fsm.Elevator.Id)
 					time.Sleep(1*time.Second)
 					fsm.Elevator.HallCalls[floor][button] = false
-					fsm.Elevator.HandledBy[floor][button] = ""
+					fsm.Elevator.HandledBy[floor][button] = "" //!This for some reason only changes locally, not in message. This is why it doesnt work
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
 					requests.Mu5.Unlock()
 
