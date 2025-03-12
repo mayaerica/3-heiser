@@ -38,7 +38,7 @@ func PrintLastReceivedMessages(message Message) {
                 
     // Print Button Requests before the existing Requests for the target elevator
     fmt.Println("  Button Requests: ")
-    for _, btnReq := range message.Requests {
+    for _, btnReq := range message.Elevator.HallCalls {
         fmt.Printf("    Button %v\n", btnReq)
     }
 
