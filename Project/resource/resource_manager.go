@@ -176,9 +176,8 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request, TimerStartChan chan time.Duration)  {
 	id := msg.Elevator.Id
-	elevators[id-8081] = msg.Elevator
 	if id != fsm.Elevator.Id{
-	
+		elevators[id-8081] = msg.Elevator
 		for floor := 0; floor < 4; floor++ { 
 			for button := 0; button < 2; button++ {
 
@@ -192,12 +191,15 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 				//removes hallcall if done
 				} else if msg.Elevator.HandledBy[floor][button] == "Done" {
 					requests.Mu5.Lock()
+					fmt.Println("\n\n\n\n\n", fsm.Elevator.Id)
+					time.Sleep(1*time.Second)
+					fsm.Elevator.HallCalls[floor][button] = false
 					fsm.Elevator.HandledBy[floor][button] = ""
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
 					requests.Mu5.Unlock()
 
 		// Only send request if the value is true
-				}else if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] {  
+				}else if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done"{  
 					//Check if request at floor and request not alreadu accounted for
 					fsm.Elevator.HallCalls[floor][button] = true
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, true) //sets hallcall light
@@ -213,7 +215,8 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 			}
 		}
 	}
-	//updates elevators with self
+	//updates elevators with self, this is needed to update information changed above
+	elevators[fsm.Elevator.Id-8081] = fsm.Elevator
 }
 
 
@@ -271,11 +274,11 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 					for floor, buttons := range floorButtonStates {
 			
 						for button, buttonState := range buttons {
-							if buttonState{
+							if buttonState && fsm.Elevator.HandledBy[floor][button] != "Done"{
 								requests.Mu5.Lock()
 								fsm.Elevator.HandledBy[floor][button]=elevatorID
 								requests.Mu5.Unlock()
-							} 
+							}
 						}
 					}
 				}
