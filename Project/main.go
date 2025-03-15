@@ -96,6 +96,8 @@ func main() {
 
 
 	//channels
+	//updateHallCallsChan := make(chan resource.HallCallUpdate)
+	//updateHandledByChan := make(chan resource.HandledByUpdate)
 	requestChan := make(chan requests.Request, numElevators*5)
 	assignChan := make(chan requests.Request, numElevators*5)
 	BtnEventChan := make(chan elevio.ButtonEvent)

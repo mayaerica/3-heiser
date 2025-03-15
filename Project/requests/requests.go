@@ -51,8 +51,6 @@ func requestsHere(e elevator.Elevator) bool {
 }
 
 func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
-
-	fmt.Println(e.Dirn)
 	
 	switch e.Dirn {
 	case elevio.MD_Up:
@@ -163,7 +161,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
 			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
 			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
-
+			fmt.Print()
 		case elevio.MD_Stop:
 			fallthrough
 		default:

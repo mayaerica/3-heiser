@@ -1,3 +1,12 @@
+Ohter notes:
+I found out I've been trying to do some impossible with the call assignment stuff by having each elevator constantly updating. We should aim for alternative one in the D-file readme which is much easier and has cookable code.
+https://github.com/TTK4145/Project-resources/blob/master/cost_fns/README.md
+
+Note to self: Always read readme.
+
+
+
+
 *******************
 Structre:
 Problem

@@ -14,6 +14,19 @@ import (
 	"time"
 )
 
+type HallCallUpdate struct {
+    HallCalls   [4][2]bool // Fixed-length array
+	Delete bool
+}
+
+type HandledByUpdate struct {
+	Floor int
+	Button int
+	HandledBy string
+}
+
+
+
 var ButtonRequestList [4][2]requests.Request
 
 var elevators = []elevator.Elevator{
@@ -174,6 +187,54 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 	}
 }
 
+
+
+//I plan on splitting UpdateElevatorHallCallsAndButtonLamp into these two functions but theyre not done yet. I will use channels :)
+/*
+func UpdateFromMessage(msg messageProcessing.Message, updateHallCallsChan chan HallCallUpdate, updateHandledByChan chan HandledByUpdate) {
+    id := msg.Elevator.Id
+    if id != fsm.Elevator.Id {
+        for floor := 0; floor < 4; floor++ {
+            for button := 0; button < 2; button++ {
+				if msg.Elevator.HandledBy[floor][button]  != "Done"{ //sends request
+					if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] {
+						updateHallCallsChan <- HallCallUpdate{
+							HallCalls: fsm.Elevator.HallCalls, 
+							Delete: false,
+						}
+					
+						if msg.Elevator.HandledBy[floor][button]  != ""{ //sends HandledBy if not empty
+							updateHandledByChan <- HandledByUpdate{
+								Floor: floor,
+								Button: button,
+								HandledBy: msg.Elevator.HandledBy[floor][button],
+							}
+						}
+
+					}
+                } else { //send delete if done
+					updateHallCallsChan <- HallCallUpdate{
+						HallCalls: fsm.Elevator.HallCalls, 
+						Delete: true,
+					}
+				}
+            }
+        }
+    }
+}
+
+
+
+func UpdateElevator (){
+
+
+
+
+
+}
+*/
+
+
 func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request, TimerStartChan chan time.Duration)  {
 	id := msg.Elevator.Id
 	requests.Mu5.Lock()
@@ -191,12 +252,10 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 					
 				//removes hallcall if done
 				} else if msg.Elevator.HandledBy[floor][button] == "Done" {
-					
 					fsm.Elevator.HallCalls[floor][button] = false
 					fsm.Elevator.HandledBy[floor][button] = "" //!This for some reason only changes locally, not in message. This is why it doesnt work
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-					
-
+				
 		// Only send request if the value is true
 				}else if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done"{  
 					//Check if request at floor and request not alreadu accounted for
