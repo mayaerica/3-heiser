@@ -1,0 +1,49 @@
+*******************
+Structre:
+Problem
+- Solution/comment
+- ^Further comment
+********************
+
+********************
+Solved:
+
+
+HandledBy is not removed by all elevators
+- Another race condtition here. So same solution as up above. UpdateElevatorHallCallsAndButtonLamp, ResourceManager and  all have to wait for eachother.
+- ^That solution should probably be changed with help of some channels.
+
+Elevator freezes when called to its floor. Note that the program is still running, just the elevator and print freezes.
+    - removed the mu lock here as it was uneccesary and cause the function wait here indefinetly, most likely because no one else used its variables or something.
+
+
+
+********************
+Unsolved:
+Upon arriving on a floor the Direction goes "Up" "Down" "Stop" if it is set to stop at that floor
+- ^ tried adding some mu.lock to fix this, Dont think it worked.
+
+Done isnt removed and rather, a done on both button types is made
+    -Not able to have this reoccur :/
+
+
+Done is not removed if elevator is alone
+- NOT IMPLEMENTED Fix: Upon being alone clear Handled_By
+
+Remvoe done list. This is more of a todo.
+ -  Just remove it from elevator and printing functions
+
+For two elevators, when 2 commands are issued, both elevators do both in different orders.
+ - NOT FIX: I have a suspition that hallcalls is wrongly used instead of requests somewhere
+ - ^ or maybe it doesnt check if someone is already assigned or something
+
+If you spam the floor the elevators at it'll stop MOVING
+
+If an elevator is called to its own floor while communicating with other elevators it gets stuck.
+
+Spamming current floor freezes elevator when alone
+
+If an elevator is moving to a floor due to a hallcall, but another arrives before due to a cab call, the elevator going for the hallcall will go out of bounds.
+ - ^This is because the cab call elevators steals the call. 
+ -NOT IMPLEMENTED Fix: I think the best solution is to just make an elevator go to the nearest floor when its request is stolen
+

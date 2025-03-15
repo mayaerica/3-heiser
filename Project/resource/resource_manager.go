@@ -176,6 +176,7 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, requestChan chan requests.Request, TimerStartChan chan time.Duration)  {
 	id := msg.Elevator.Id
+	requests.Mu5.Lock()
 	if id != fsm.Elevator.Id{
 		elevators[id-8081] = msg.Elevator
 		for floor := 0; floor < 4; floor++ { 
@@ -183,20 +184,18 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 
 				//################Sets floor calls and removes true if all elevators have finished removing buttoncall ####################################
 				if fsm.Elevator.HandledBy[floor][button] == "Done" && !elevators[0].HallCalls[floor][button] && !elevators[1].HallCalls[floor][button] && !elevators[2].HallCalls[floor][button] {
-					requests.Mu5.Lock()
+					
 					fsm.Elevator.HandledBy[floor][button] = ""
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-					requests.Mu5.Unlock()
+					
 					
 				//removes hallcall if done
 				} else if msg.Elevator.HandledBy[floor][button] == "Done" {
-					requests.Mu5.Lock()
-					fmt.Println("\n\n\n\n\n", fsm.Elevator.Id)
-					time.Sleep(1*time.Second)
+					
 					fsm.Elevator.HallCalls[floor][button] = false
 					fsm.Elevator.HandledBy[floor][button] = "" //!This for some reason only changes locally, not in message. This is why it doesnt work
 					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-					requests.Mu5.Unlock()
+					
 
 		// Only send request if the value is true
 				}else if msg.Elevator.HallCalls[floor][button] && !fsm.Elevator.HallCalls[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done"{  
@@ -217,6 +216,7 @@ func UpdateElevatorHallCallsAndButtonLamp(msg messageProcessing.Message, request
 	}
 	//updates elevators with self, this is needed to update information changed above
 	elevators[fsm.Elevator.Id-8081] = fsm.Elevator
+	requests.Mu5.Unlock()
 }
 
 
@@ -224,14 +224,13 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 	for {
 		// Checks if elevators are active before sending them to request
 		var activeElevators = []elevator.Elevator{}
-
+		messageProcessing.Mu2.Lock()
 		for _,elevator := range elevators {
             if messageProcessing.ElevatorStatus[strconv.Itoa(elevator.Id)] {
-				messageProcessing.Mu2.Lock()
 				activeElevators = append(activeElevators,elevator)
-				messageProcessing.Mu2.Unlock()
 			}
         }
+		messageProcessing.Mu2.Unlock()
 
 
 		if len(activeElevators)!=0 {
@@ -239,6 +238,7 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 		
 			//fmt.Println("fem", activeElevators)
 
+			requests.Mu5.Lock()
 			input := ConvertRequestToHRAInput(activeElevators)
 
 			// Call function to process requests
@@ -249,7 +249,7 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 			}
 
 			
-			//sets request if only one elevator active
+			//sets request if only one elevator active. Unsure whether this is needed
 			if len(activeElevators) == 1 {
 				for _, floorButtonStates := range output {
 
@@ -257,10 +257,10 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 			
 						for button, buttonState := range buttons {
 							if buttonState {
-								requests.Mu5.Lock()
+								
 								fsm.Elevator.Requests[floor][button] = buttonState
 								fsm.OnRequestButtonPress(floor, elevio.ButtonType(button), TimerStartChan)
-								requests.Mu5.Unlock()
+								
 
 							}
 						}
@@ -274,11 +274,11 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 					for floor, buttons := range floorButtonStates {
 			
 						for button, buttonState := range buttons {
+							
 							if buttonState && fsm.Elevator.HandledBy[floor][button] != "Done"{
-								requests.Mu5.Lock()
 								fsm.Elevator.HandledBy[floor][button]=elevatorID
-								requests.Mu5.Unlock()
 							}
+							
 						}
 					}
 				}
@@ -289,9 +289,7 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 							for floor := 0; floor < 4; floor++ { 
 								for button := 0; button < 2; button++ {
 									if elevator.HandledBy[floor][button] == fsm.Elevator.HandledBy[floor][button] && fsm.Elevator.HandledBy[floor][button] == strconv.Itoa(fsm.Elevator.Id) && !fsm.Elevator.Requests[floor][button] {
-										requests.Mu5.Lock()
 										fsm.Elevator.Requests[floor][button] = true
-										requests.Mu5.Unlock()
 										fsm.OnRequestButtonPress(floor, elevio.ButtonType(button), TimerStartChan)
 
 									//If an elevator is alone and gets a connection its requests should be wiped
@@ -301,7 +299,7 @@ func ResourceManager(requestChan chan requests.Request, assignChan chan requests
 						}	
 					}
 				}
-			
+				requests.Mu5.Unlock()
 		}
 	}
 }

@@ -64,18 +64,18 @@ func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message){
     for{
         select {
             case p :=<-peerUpdateCh:
-
+            Mu2.Lock()
             for elevator := range p.Lost {
-                Mu2.Lock()
+                
                 ElevatorStatus[p.Lost[elevator]]=false
-                Mu2.Unlock()
+                
             }
 
             if len (p.New)!=0{
-                Mu2.Lock()
                 ElevatorStatus[p.New]=true
-                Mu2.Unlock()
             }
+
+            Mu2.Unlock()
 
             default:
                 

@@ -24,7 +24,7 @@ import (
 Hanled by, requests, done and hallcalls are handled twice. Once by resourcemanager and once by UpdateElevatorHallCallsAndButtonLamp. 
 This should be fixed so that only one of them needs to set a value false when needed.
 */
-var UpdateInterval = 200 * time.Millisecond
+var UpdateInterval = 100 * time.Millisecond
 
 const (
 	numElevators = 3
@@ -118,9 +118,10 @@ func main() {
 	//continously updating messages:
 	go messageProcessing.UpdateMessage(peerUpdateCh, messageTx)
 
-
+	elevio.SetDoorOpenLamp(false) //I am unsure why this is needed but it works. When initializing on first floor without this, door light is on.
 	//event loop
 	for {
+		//fmt.Println("still alive")
 		select {
 		case btn := <-BtnEventChan:
 			if btn.Button != elevio.BT_Cab {
@@ -134,6 +135,7 @@ func main() {
 					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
 					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
 				}
+				
 		case floor := <-FloorChan:
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
@@ -159,12 +161,13 @@ func main() {
 
 		
 		case <-ticker.C:
-			//fmt.Println("6")
+			//fmt.Println("55")
 			resource.PrintElevators()
 	
 
 		case msg := <-messageRx:
 			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
+			//fmt.Println("\n\n\n\n\n 7 \n\n\n\n\n")
 			resource.UpdateElevatorHallCallsAndButtonLamp(msg, requestChan, TimerStartChan)
 
 		

@@ -3,6 +3,7 @@ package requests
 import (
 	"elevatorlab/elevator"
 	"elevatorlab/elevio"
+	"fmt"
 	"sync"
 )
 
@@ -50,13 +51,16 @@ func requestsHere(e elevator.Elevator) bool {
 }
 
 func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
+
+	fmt.Println(e.Dirn)
+	
 	switch e.Dirn {
 	case elevio.MD_Up:
 		if requestsAbove(e) {
 			return DirnBehaviourPair{elevio.MD_Up, elevator.MOVING}
 		}
 		if requestsHere(e) {
-			return DirnBehaviourPair{elevio.MD_Down, elevator.DOOR_OPEN}
+			return DirnBehaviourPair{elevio.MD_Stop ,elevator.DOOR_OPEN}
 		}
 		if requestsBelow(e) {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
@@ -68,7 +72,7 @@ func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
 		}
 		if requestsHere(e) {
-			return DirnBehaviourPair{elevio.MD_Up, elevator.DOOR_OPEN}
+			return DirnBehaviourPair{elevio.MD_Stop, elevator.DOOR_OPEN}
 		}
 		if requestsAbove(e) {
 			return DirnBehaviourPair{elevio.MD_Up, elevator.MOVING}
@@ -130,10 +134,8 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
-
+func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {  
 	//locksDone, Request and hallcall from D file 
-	Mu5.Lock()
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
 		for btn := 0; btn < elevator.N_BUTTONS; btn++ {
@@ -150,7 +152,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			}
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
 			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
-			e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
+			//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
 
 		case elevio.MD_Down:
 			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.BT_HallDown] {
@@ -160,7 +162,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			}
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
 			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
-			e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
+			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
 
 		case elevio.MD_Stop:
 			fallthrough
@@ -170,13 +172,13 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 
 			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
 			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
-			//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
-			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done" These are usually turned of if its idle, but it kinda ruins for the other elevators
+
+			e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
+			e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done" //These are usually turned of if its idle, but it kinda ruins for the other elevators
 
 
 		}
 	default:
 	}
-	Mu5.Unlock()
 	return e
 }
