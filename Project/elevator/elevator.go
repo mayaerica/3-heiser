@@ -28,7 +28,7 @@ const N_FLOORS int = 4
 const N_BUTTONS int = 3
 
 type Elevator struct {
-	Id        int 		
+	Id        string 		
 	Floor     int
 	Dirn      elevio.Dirn         // moving up, down, or emergency stop
 	Behaviour ElevatorBehaviour // idle, door open, moving

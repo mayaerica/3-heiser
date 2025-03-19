@@ -70,7 +70,6 @@ func SetMotorDirection(dir Dirn) [4]byte {
 }
 
 func SetButtonLamp(button ButtonType, floor int, value bool) [4]byte {
-	fmt.Println("hey")
 	buttonLamp := [4]byte{2, byte(button), byte(floor), ToByte(value)}
 	write(buttonLamp)
 	return buttonLamp

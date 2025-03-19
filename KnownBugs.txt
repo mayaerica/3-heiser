@@ -56,3 +56,6 @@ If an elevator is moving to a floor due to a hallcall, but another arrives befor
  - ^This is because the cab call elevators steals the call. 
  -NOT IMPLEMENTED Fix: I think the best solution is to just make an elevator go to the nearest floor when its request is stolen
 
+
+TODO for me:
+- Make elevator set "Done" when arrived at floor
