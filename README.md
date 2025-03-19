@@ -18,6 +18,12 @@ The project is organised into different modules used in `main` files :
 ## User guide
 ### Requirements
 - Go (latest version recommended)
+
+### Acceptance tests
+Ech module folder has an `module_test.go` file that you can run with this commande :
+> go test -v
+
+
 ### Command operation
 To run the elevator simulation, follow the following steps :
 
