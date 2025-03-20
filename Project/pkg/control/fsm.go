@@ -3,24 +3,25 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
-	"elevatorlab/pkg/control/movement"
-	"elevatorlab/pkg/control/dispatcher"
 	"time"
 	"strconv"
 )
 
+
 var Elevator common.Elevator
 var StateChan = make(chan common.ElevatorBehaviour)
+var OrderComplete = make(chan elevio.ButtonEvent) // NEW: Tracks completed requests
 
 func InitFSM(elevatorID int) {
 	Elevator = common.Elevator{
-		ID:                  strconv.Itoa(elevatorID),
+		ID:                  elevatorID,
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
 		ClearRequestVariant: common.CV_All,
 	}
 
 	go StateMachineLoop()
+	go executionLoop()
 }
 
 func StateMachineLoop() {
@@ -31,6 +32,55 @@ func StateMachineLoop() {
 			handleState()
 		}
 	}
+}
+
+func executionLoop() {
+	buttonPressChan := make(chan elevio.ButtonEvent)
+	floorSensorChan := make(chan int)
+
+	go elevio.PollButtons(buttonPressChan)
+	go elevio.PollFloorSensor(floorSensorChan)
+
+	for {
+		select {
+		case buttonPress := <-buttonPressChan:
+			handleButtonPress(buttonPress)
+
+		case floor := <-floorSensorChan:
+			Elevator.Floor = floor
+			elevio.SetFloorIndicator(floor)
+
+			// Stop at the floor if necessary
+			if movement.RequestShouldStop(Elevator) {
+				movement.StopElevator()
+				handleFloorArrival()
+			}
+
+		case <-OrderComplete:
+			dispatcher.ClearRequests(Elevator)
+			StateChan <- common.IDLE
+		}
+	}
+}
+
+func handleButtonPress(buttonPress elevio.ButtonEvent) {
+	dispatcher.AssignRequest(buttonPress.Floor, buttonPress.Button, Elevator.ID)
+
+	if Elevator.Behaviour == common.IDLE {
+		StateChan <- common.MOVING
+	}
+}
+
+func handleFloorArrival() {
+	Elevator.Behaviour = common.DOOR_OPEN
+	elevio.SetDoorOpenLamp(true)
+	time.Sleep(Elevator.DoorOpenDuration)
+	elevio.SetDoorOpenLamp(false)
+
+	// Clear the request based on direction
+	dispatcher.ClearRequests(Elevator)
+
+	StateChan <- common.IDLE
 }
 
 func handleState() {
@@ -126,5 +176,26 @@ func HandleHallRequest(floor int, button int) {
 func ClearHallRequest(floor int, button int) {
 	if GetOrderState(floor, button) == common.Existing {
 		UpdateOrderState(floor, button, common.NonExisting)
+	}
+}
+
+func handleDoorOpenState() {
+	elevio.SetDoorOpenLamp(true)
+	doorTimeout := time.After(Elevator.DoorOpenDuration)
+
+	for {
+		select {
+		case obstructed := <-elevio.PollObstructionSwitch():
+			if obstructed {
+				doorTimeout = time.After(Elevator.DoorOpenDuration) // Restart timer
+			}
+
+		case <-doorTimeout:
+			if !elevio.GetObstructionSwitch() {
+				elevio.SetDoorOpenLamp(false)
+				StateChan <- common.IDLE
+				return
+			}
+		}
 	}
 }
