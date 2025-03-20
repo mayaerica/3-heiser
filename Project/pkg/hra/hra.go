@@ -21,7 +21,7 @@ type HRAElevState struct {
 }
 
 // input format for HRA
-type hraInput struct {
+type HRAInput struct {
 	HallRequests [common.N_FLOORS][2]bool `json:"hallRequests"`
 	States       map[string]HRAElevState  `json:"states"`
 }
@@ -39,7 +39,7 @@ func getHRAExecutable() string {
 }
 
 // create HRA input from elevator states and hall requests
-func CreateHRAInput(elevatorStates map[int]common.Elevator, hallRequests [common.N_FLOORS][2]bool) hraInput {
+func CreateHRAInput(elevatorStates map[int]common.Elevator, hallRequests [common.N_FLOORS][2]bool) HRAInput {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -60,7 +60,7 @@ func CreateHRAInput(elevatorStates map[int]common.Elevator, hallRequests [common
 	}
 }
 
-func ProcessElevatorRequests(input hraInput) (map[int]map[int][2]bool, error) {
+func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
 	hraExecutable := getHRAExecutable()
 
 	jsonBytes, err := json.Marshal(input)
@@ -80,7 +80,7 @@ func ProcessElevatorRequests(input hraInput) (map[int]map[int][2]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json.Unmarshal error: %v", err)
 	}
-	return output, nil
+	return utils.ConvertHRAOutput(output)
 }
 
 // map HRA output to an elevators state

@@ -3,6 +3,8 @@ package utils
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"strconv"
+	"fmt"
 )
 
 
@@ -32,3 +34,18 @@ func DirectionToString(d elevio.Dirn) string {
 	}
 }
 
+func ConvertHRAOutput(output map[string][][2]bool) (map[int]map[int][2]bool, error) {
+	convertedOutput := make(map[int]map[int][2]bool)
+	for key, floorRequests := range output {
+		elevatorID, err := strconv.Atoi(key)
+		if err != nil {
+			return nil, fmt.Errorf("strconv.Atoi error: %v", err)
+		}
+		floorMap := make(map[int][2]bool)
+		for floor, buttons := range floorRequests {
+			floorMap[floor] = buttons
+		}
+		convertedOutput[elevatorID] = floorMap
+	}
+	return convertedOutput, nil
+}
