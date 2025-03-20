@@ -1,0 +1,34 @@
+/cmd                    
+│   ├── main.go           
+│   ├── config.go            # dont know if its completely necessary 
+│
+/elevio                      # Handles hardware communication
+│   ├── elevio.go
+│
+/common                      # Shared types, enums, and definitions
+│   ├── types.go             # Centralized type definitions (Elevator, Requests, Directions)
+│
+/pkg
+│   ├── /control             # Manages elevator operation & state transitions
+│   │   ├── fsm.go           # Handles finite state machine & synchronization, request processing
+│   │   ├── movement.go      # Controls movement (motor, doors, stopping)
+│   │   ├── indicators.go    # Manages lights, indicators, ...door state machine..? 
+│   │   ├── dispatcher.go    # Assigns requests & balances load (combines the synchronizer idea & resource_manager)
+│
+│   ├── /network             # Handles communication between elevators
+│   │   ├── peers.go         # Manages peer discovery
+│   │   ├── bcast.go         # Handles broadcasting messages
+│   │   ├── localip.go       # Gets local IP address
+│   │   ├── conn.go          # Handles connections
+│
+│   ├── /hra                 # Hall Request Assigner integration (hjelpes)
+│   │   ├── hra.go           # Calls external HRA binary
+│
+│   ├── /backup              # Manages persistent state storage
+│   │   ├── persistence.go   # Saves & loads elevator states
+│
+│   ├── /utils               # General helper functions i guess
+│   │   ├── conversions.go
+│
+go.mod                    
+README.md                 

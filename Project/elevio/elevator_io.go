@@ -6,13 +6,16 @@ import "net"
 import "fmt"
 
 
+const N_FLOORS int = 4
+const N_BUTTONS int = 3
 
 const _pollRate = 20 * time.Millisecond
 
 var _initialized    bool = false
-var _numFloors      int = 4
+var _numFloors      int = N_FLOORS
 var _mtx            sync.Mutex
 var _conn           net.Conn
+
 
 type Dirn int
 
@@ -22,18 +25,7 @@ const (
 	MD_Stop  Dirn = 0
 )
 
-func (d Dirn) String() string {
-	switch d {
-	case MD_Up:
-		return "Up"
-	case MD_Down:
-		return "Down"
-	case MD_Stop:
-		return "Stop"
-	default:
-		return "Unknown"
-	}
-}
+
 type ButtonType int
 
 const (
@@ -41,6 +33,7 @@ const (
 	BT_HallDown 
 	BT_Cab      
 )
+
 
 type ButtonEvent struct {
 	Floor  int
@@ -141,8 +134,6 @@ func PollObstructionSwitch(receiver chan<- bool) {
 }
 
 
-
-
 func GetButton(button ButtonType, floor int) bool {
 	a := read([4]byte{6, byte(button), byte(floor), 0})
 	return ToBool(a[1])
@@ -166,8 +157,6 @@ func GetObstruction() bool {
 	a := read([4]byte{9, 0, 0, 0})
 	return ToBool(a[1])
 }
-
-
 
 
 
