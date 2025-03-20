@@ -41,6 +41,14 @@ const (
 	Unknown
 )
 
+type Perspective struct {
+	ID string
+	Perspective [N_FLOORS][2]OrderState
+}
+
+// global state for tracking
+var GlobalPerspective Perspective
+
 // Checks if the elevator should stop at the given floor based on requests.
 func (e *Elevator) ShouldStop(floor int) bool {
 	// Iterate through the three possible buttons for this floor (up, down, or internal request)

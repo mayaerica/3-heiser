@@ -4,9 +4,11 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/hra"
+	"elevatorlab/pkg/control/movement"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
 	"sync"
+	"strconv"
 	"time"
 )
 
@@ -39,7 +41,9 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 		if assignedElevatorID == elevatorID {
 			for assignedFloor, assignedButtons := range floorRequests {
 				if assignedFloor == floor && assignedButtons[button] {
-					ElevatorStates[elevatorID].Requests[floor][button] = true
+					elevator := ElevatorStates[elevatorID]
+					elevator.Requests[floor][button] = true
+					ElevatorStates[elevatorID] = elevator
 					return true
 				}
 			}
@@ -48,38 +52,46 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	return false
 }
 
-func Synchronizer() {
-	stateTx := make(chan common.Elevator) //sends state updates
-	stateRx := make(chan common.Elevator) //recieves state updates
 
-	go bcast.Transmitter(1600, stateTx) //broadcast elevator state
-	go bcast.Receiver(1600, stateRx)    //recieve state updates
 
-	peerUpdateChan := make(chan peers.PeerUpdate)
-	go peers.Receiver(15000, peerUpdateChan)
+var networkAlive bool = true
 
-	ticker := time.NewTicker(200 * time.Millisecond)
+func Synchronizer(existingOrders chan<- [N_FLOORS][2]bool, myID string) {
+    perspectiveRx := make(chan control.Perspective)
+    perspectiveTx := make(chan control.Perspective)
 
-	for {
-		select {
-		case newState := <-stateRx:
-			mutex.Lock()
-			ElevatorStates[newState.ID] = newState
-			mutex.Unlock()
-		case peerList := <-peerUpdateChan:
-			for _, lostPeer := range peerList.Lost {
-				mutex.Lock()
-				delete(ElevatorStates, lostPeer)
-				mutex.Unlock()
-			}
-		case <-ticker.C:
-			mutex.Lock()
-			for _, elevator := range ElevatorStates {
-				stateTx <- elevator //broadcast state updates
-			}
-			mutex.Unlock()
-		}
-	}
+    go bcast.Transmitter(21478, perspectiveTx)
+    go bcast.Receiver(21478, perspectiveRx)
+
+    peerUpdateCh := make(chan peers.PeerUpdate)
+    go peers.Receiver(15680, peerUpdateCh)
+
+    ticker := time.NewTicker(50 * time.Millisecond) // Optimized frequency
+
+    for {
+        select {
+        case peerUpdate := <-peerUpdateCh:
+            if len(peerUpdate.Peers) == 0 {
+                networkAlive = false
+            } else {
+                networkAlive = true
+            }
+
+        case theirs := <-perspectiveRx:
+            for floor := 0; floor < N_FLOORS; floor++ {
+                for btn := 0; btn < 2; btn++ {
+                    if theirs.Perspective[floor][btn] == control.Existing {
+                        control.UpdateOrderState(floor, btn, control.Existing)
+                    }
+                }
+            }
+
+        case <-ticker.C:
+            if networkAlive {
+                perspectiveTx <- control.GlobalPerspective
+            }
+        }
+    }
 }
 
 func ChooseDirection(e common.Elevator) common.DirnBehaviourPair {

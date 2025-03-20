@@ -114,3 +114,24 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType) {
 	dispatcher.AssignRequest(btn_floor, btn_type, Elevator.ID)
 	Elevator.Requests[btn_floor][btn_type] = true
 }
+
+func UpdateOrderState(floor int, button int, state OrderState) {
+	common.GlobalPerspective.Perspective[floor][button] = state
+}
+
+func GetOrderState(floor int, button int) OrderState {
+	return common.GlobalPerspective.Perspective[floor][button]
+}
+
+func HandleHallRequest(floor int, button int) {
+	currentState := GetOrderState(floor, button)
+	if currentState == common.NonExisting || currentState == common.Unknown {
+		UpdateOrderState(floor, button, common.HalfExisting)
+	}
+}
+
+func ClearHallRequest(floor int, button int) {
+	if GetOrderState(floor, button) == common.Existing {
+		UpdateOrderState(floor, button, common.NonExisting)
+	}
+}
