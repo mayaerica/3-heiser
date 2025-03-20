@@ -3,27 +3,24 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
-	"elevatorlab/pkg/control/dispatcher"
 	"elevatorlab/pkg/control/movement"
-	"elevatorlab/pkg/hra"
-	"elevatorlab/pkg/network"
+	"elevatorlab/pkg/control/dispatcher"
 	"time"
+	"strconv"
 )
 
 var Elevator common.Elevator
 var StateChan = make(chan common.ElevatorBehaviour)
-var ElevatorStateUpdate = make(chan common.Elevator) //this guy will send state updates to the network
 
 func InitFSM(elevatorID int) {
 	Elevator = common.Elevator{
-		ID:                  elevatorID,
+		ID:                  strconv.Itoa(elevatorID),
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
 		ClearRequestVariant: common.CV_All,
 	}
 
 	go StateMachineLoop()
-	go network.BroadcastElevatorState(ElevatorStateUpdate) // elevator state is shared across network
 }
 
 func StateMachineLoop() {
@@ -49,25 +46,19 @@ func handleState() {
 
 // Wait for new request or HRA assignment
 func handleIdleState() {
-	hraInput := hra.CreateHRAInput() //get current elevator and hall requests
-	hraOutput, err := hra.ProcessElevatorRequests(hraInput)
-	if err == nil {
-		Elevator = hra.HRAMapToElevator(hraOutput, Elevator) //update elevator with HRA results
+	// Wait for full confirmation before assigning requests
+	for floor := 0; floor < common.N_FLOORS; floor++ {
+		for button := 0; button < 2; button++ {
+			if GetOrderState(floor, button) == common.HalfExisting {
+				return // Wait for confirmation before acting
+			}
+		}
 	}
 
 	nextDirn := dispatcher.ChooseDirection(Elevator)
-
 	if nextDirn.Behaviour == common.MOVING {
 		Elevator.Behaviour = common.MOVING
 		Elevator.Dirn = nextDirn.Dirn
-		movement.StartMoving(Elevator.Dirn)
-		ElevatorStateUpdate <- Elevator // broadcast state update
-	} else if nextDirn.Behaviour == common.DOOR_OPEN {
-		Elevator.Behaviour = common.DOOR_OPEN
-		elevio.SetDoorOpenLamp(true)
-		time.Sleep(Elevator.DoorOpenDuration)
-		dispatcher.ClearRequests(Elevator)
-		StateChan <- common.IDLE // transition back to idle after door closes
 	}
 }
 
@@ -94,20 +85,22 @@ func handleMovingState() {
 }
 
 // hold door open, then determine next action
+
 func handleDoorOpenState() {
 	elevio.SetDoorOpenLamp(true)
 	time.Sleep(Elevator.DoorOpenDuration)
 	elevio.SetDoorOpenLamp(false)
 
-	nextDirn := dispatcher.ChooseDirection(Elevator)
-
-	if nextDirn.Behaviour == common.MOVING {
-		Elevator.Behaviour = common.MOVING
-		Elevator.Dirn = nextDirn.Dirn
-		movement.StartMoving(Elevator.Dirn)
-	} else {
-		Elevator.Behaviour = common.IDLE
+	// Only clear if fully confirmed
+	for floor := 0; floor < common.N_FLOORS; floor++ {
+		for button := 0; button < 2; button++ {
+			if GetOrderState(floor, button) == common.Existing {
+				ClearHallRequest(floor, button)
+			}
+		}
 	}
+
+	StateChan <- common.IDLE
 }
 
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType) {
