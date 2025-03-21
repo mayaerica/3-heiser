@@ -22,14 +22,14 @@ func InitFSM(elevatorID int) {
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3000,
+		DoorOpenDuration:    3*time.Second,
 	}
 
 	backup.LoadCabRequests(&Elevator)
 
-	go indicators.DoorFSM(DoorOpenChan, DoorCloseChan, time.Duration(Elevator.DoorOpenDuration)*time.Millisecond)
 	go StateMachineLoop()
 	go executionLoop()
+	go indicators.DoorFSM(DoorOpenChan, DoorCloseChan, Elevator.DoorOpenDuration)
 }
 
 func StateMachineLoop() {
@@ -78,6 +78,8 @@ func handleButtonPress(buttonPress elevio.ButtonEvent) {
 		backup.SaveCabRequests(Elevator)
 	}
 
+	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+
 	if Elevator.Behaviour == common.IDLE {
 		StateChan <- common.MOVING
 	}
@@ -88,6 +90,7 @@ func handleFloorArrival() {
 	DoorOpenChan <- struct{}{} //start door FSM
 	<-DoorCloseChan            //wait for door to close
 	dispatcher.ClearRequests(Elevator)
+	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 	StateChan <- common.IDLE
 }
 
@@ -116,6 +119,7 @@ func handleIdleState() {
 		Elevator.Behaviour = common.MOVING
 		Elevator.Dirn = nextDirn.Dirn
 	}
+	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 }
 
 
@@ -128,7 +132,10 @@ func handleMovingState() {
 
 			if movement.RequestShouldStop(Elevator) {
 				movement.StopElevator()
-				Elevator.Behaviour = common.DOOR_OPEN
+				DoorOpenChan <- struct{}{} 
+				<-DoorCloseChan
+				dispatcher.ClearRequests(Elevator)
+				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 				StateChan <- common.IDLE
 				return
 			}
@@ -140,15 +147,8 @@ func handleMovingState() {
 func handleDoorOpenState() {
 	DoorOpenChan <- struct{}{} //trigger door open
 	<-DoorCloseChan            //wait till it closes
-
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		for button := 0; button < 2; button++ {
-			if GetOrderState(floor, button) == common.Existing {
-				ClearHallRequest(floor, button)
-			}
-		}
-	}
-
+	dispatcher.ClearRequests(Elevator)
+	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 	StateChan <- common.IDLE
 }
 

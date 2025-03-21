@@ -9,7 +9,7 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 	obstructionChan := make(chan bool)
 	go elevio.PollObstructionSwitch(obstructionChan)
 
-	for {
+	for{
 		select {
 		case <-doorOpen:
 			elevio.SetDoorOpenLamp(true)
@@ -25,7 +25,6 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 					if !elevio.GetObstruction() {
 						elevio.SetDoorOpenLamp(false)
 						doorClosed <- struct{}{} //notify fsm
-						break
 					} else {
 						timer.Reset(duration) //stay open until obstruction is removed
 					}

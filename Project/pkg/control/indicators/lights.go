@@ -5,32 +5,24 @@ import (
 	"elevatorlab/elevio"
 )
 
-func SetAllLights(e common.Elevator) {
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		for btn := 0; btn < common.N_BUTTONS; btn++ {
-			elevio.SetButtonLamp(elevio.ButtonType(btn), floor, e.Requests[floor][btn])
-		}
-	}
+func UpdateAllLights(e common.Elevator, perspective [common.N_FLOORS][2]common.OrderState){
+	UpdateCabLights(e)
+	UpdateHallLightsFromPerspective(perspective)
 }
 
-func UpdateHallLights(hallRequests [common.N_FLOORS][2]bool) {
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		for btnType := 0; btnType < 2; btnType++ { //only hall up and hall down
-			elevio.SetButtonLamp(elevio.ButtonType(btnType), floor, hallRequests[floor][btnType])
-		}
-	}
-}
-
-func UpdateCabLights(e common.Elevator) {
+//pending cab requests
+func UpdateCabLights(e common.Elevator){
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		elevio.SetButtonLamp(elevio.BT_Cab, floor, e.Requests[floor][elevio.BT_Cab])
 	}
 }
 
-func UpdateFloorIndicator(floor int) {
-	elevio.SetFloorIndicator(floor)
-}
-
-func SetDoorOpenLamp(state bool) {
-	elevio.SetDoorOpenLamp(state)
+//regarding hall buttons - if their order state is not NonExisting
+func UpdateHallLightsFromPerspective(perspective [common.N_FLOORS][2]common.OrderState){
+	for floor:=0; floor < common.N_FLOORS; floor++ {
+		for btnType:=0; btnType < 2; btnType++{
+			shouldBeLit := perspective[floor][btnType] != common.NonExisting
+			elevio.SetButtonLamp(elevio.ButtonType(btnType), floor, shouldBeLit)
+		}
+	}
 }
