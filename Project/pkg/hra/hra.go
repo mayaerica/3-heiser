@@ -2,16 +2,14 @@ package hra
 
 import (
 	"elevatorlab/common"
+	"elevatorlab/elevio"
 	"elevatorlab/pkg/utils"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"runtime"
-	"sync"
+	"strconv"
 )
-
-// to prevent race conditions in HRA processing
-var mutex sync.Mutex
 
 type HRAElevState struct {
 	Behaviour   string `json:"behaviour"`
@@ -26,83 +24,65 @@ type HRAInput struct {
 	States       map[string]HRAElevState  `json:"states"`
 }
 
-// get correct HRA executable based on OS
-func getHRAExecutable() string {
-	switch runtime.GOOS {
-	case "linux":
-		return "hall_request_assigner"
-	case "windows":
-		return "hall_request_assigner.exe"
-	default:
-		panic("Unsupported OS")
-	}
-}
-
 // create HRA input from elevator states and hall requests
-func CreateHRAInput(elevatorStates map[int]common.Elevator, hallRequests [common.N_FLOORS][2]bool) HRAInput {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	hraStates := make(map[string]HRAElevState)
-
-	for id, elevator := range elevatorStates {
-		hraStates[fmt.Sprintf("%d", id)] = HRAElevState{
-			Behaviour:   utils.BehaviourToString(elevator.Behaviour),
-			Floor:       elevator.Floor,
-			Direction:   utils.DirectionToString(elevator.Dirn),
-			CabRequests: extractCabRequests(elevator),
+func CreateHRAInput(states map[int]common.Elevator, hall [common.N_FLOORS][2]bool) HRAInput {
+	out := HRAInput{
+		HallRequests: hall,
+		States:       make(map[string]HRAElevState),
+	}
+	
+	for id, elev:= range states{
+		out.States[strconv.Iota(id)] = HRAElevState{
+			Behaviour:    utils.BehaviourToString(elev.Behaviour),
+			Floor:        elev.Floor,
+			Direction:    utils.DirectionToString(elev.Dirn),
+			CabRequests:  extractCabRequests(elev),
 		}
 	}
-
-	return HRAInput{
-		HallRequests: hallRequests,
-		States:       hraStates,
-	}
+	return out
 }
 
 func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
-	hraExecutable := getHRAExecutable()
-
-	jsonBytes, err := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
 	if err != nil {
-		return nil, fmt.Errorf("json.Marshal error: %v", err)
+		return nil, err
 	}
 
-	//execute HRA binary
-	ret, err := exec.Command("./hall_request_assigner"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("exec.Command error: %v\nOutput: %s", err, string(ret))
+	exe := "./hall_request_assigner"
+	if runtime.GOOS == "windows"{
+		exe += ".exe"
 	}
 
-	//convert JSON response to Go structure
-	var output map[string][][2]bool
-	err = json.Unmarshal(ret, &output)
+	cmd:= exec.Command(exe, "-i", string(inputJSON))
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("json.Unmarshal error: %v", err)
+		return nil, fmt.Errorf("hra execution failed: %v\n%s", err, string(output))
 	}
-	return utils.ConvertHRAOutput(output)
-}
+	
+	var outputRaw map[string]map[string][2]bool
+	err = json.Unmarshal(output, &outputRaw)
+	if err != nil{
+		return nil, fmt.Errorf("hra output fail: %v", err)
+	}
 
-// map HRA output to an elevators state
-func HRAMapToElevator(hraOutput map[string][][2]bool, e common.Elevator) common.Elevator {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	if floorRequests, exists := hraOutput[fmt.Sprintf("%d", e.ID)]; exists {
-		for floor, buttons := range floorRequests {
-			e.Requests[floor][0] = buttons[0] //Hall Up
-			e.Requests[floor][1] = buttons[1] //Hall Down
+	//convert keys to int
+	results:= make(map[int]map[int][2]bool)
+	for idStr, floorMap := range outputRaw {
+		id,_:= strconv.Atoi(idStr)
+		results[id] = make(map[int][2]bool)
+		for floorStr, btns:= range floorMap{
+			floor, _:= strconv.Atoi(floorStr)
+			results[id][floor] = btns
 		}
 	}
-
-	return e
+	return results, nil
 }
 
 // extract cab requests from elevator
 func extractCabRequests(e common.Elevator) []bool {
 	cabRequests := make([]bool, common.N_FLOORS)
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		cabRequests[floor] = e.Requests[floor][2]
+	for f := 0; f < common.N_FLOORS; f++ {
+		cabRequests[f] = e.Requests[f][elevio.BT_Cab]
 	}
 	return cabRequests
 }
