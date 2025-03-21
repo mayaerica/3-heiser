@@ -3,8 +3,9 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"elevatorlab/pkg/backup"
+	"elevatorlab/pkg/control/movement"
 	"elevatorlab/pkg/hra"
-	 "elevatorlab/pkg/control/movement"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
 	"sync"
@@ -19,7 +20,6 @@ func InitDispatcher() {
 	ElevatorStates = make(map[int]common.Elevator)
 	go Synchronizer()
 }
-
 
 func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	mutex.Lock()
@@ -61,8 +61,6 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	}
 	return false
 }
-
-
 
 var networkAlive bool = true
 
@@ -120,4 +118,5 @@ func ClearRequests(e common.Elevator) {
 	for btn := 0; btn < common.N_BUTTONS; btn++ {
 		e.Requests[e.Floor][btn] = false
 	}
+	backup.SaveCabRequests(e)
 }

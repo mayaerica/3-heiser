@@ -3,6 +3,7 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"elevatorlab/pkg/backup"
 	"time"
 	"strconv"
 )
@@ -19,7 +20,7 @@ func InitFSM(elevatorID int) {
 		Dirn:                elevio.MD_Stop,
 		ClearRequestVariant: common.CV_All,
 	}
-
+	backup.LoadCabRequests(&Elevator)
 	go StateMachineLoop()
 	go executionLoop()
 }
@@ -156,6 +157,9 @@ func handleDoorOpenState() {
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType) {
 	dispatcher.AssignRequest(btn_floor, btn_type, Elevator.ID)
 	Elevator.Requests[btn_floor][btn_type] = true
+	if btn_type == elevio.BT_Cab {
+		backup.SaveCabRequests(Elevator)
+	}
 }
 
 func UpdateOrderState(floor int, button int, state OrderState) {
