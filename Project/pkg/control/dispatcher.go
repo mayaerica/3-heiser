@@ -113,10 +113,4 @@ func ChooseDirection(e common.Elevator) common.DirnBehaviourPair {
 	return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 }
 
-// for the current floor:
-func ClearRequests(e common.Elevator) {
-	for btn := 0; btn < common.N_BUTTONS; btn++ {
-		e.Requests[e.Floor][btn] = false
-	}
-	backup.SaveCabRequests(e)
-}
+

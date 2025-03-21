@@ -13,7 +13,7 @@
 │   │   ├── fsm.go           # Handles finite state machine & synchronization, request processing
 │   │   ├── movement.go      # Controls movement (motor, doors, stopping)
 │   │   ├── indicators.go    # Manages lights, indicators, ...door state machine..? 
-│   │   ├── dispatcher.go    # Assigns requests & balances load (combines the synchronizer idea & resource_manager)
+│   │   ├── dispatcher.go    # resource_manager before! this one is scary because it handles network coordination and HRA assignment
 │
 │   ├── /network             # Handles communication between elevators
 │   │   ├── peers.go         # Manages peer discovery

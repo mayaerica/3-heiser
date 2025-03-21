@@ -7,12 +7,12 @@ import (
 	"elevatorlab/pkg/control/dispatcher"
 	"elevatorlab/pkg/control/indicators"
 	"elevatorlab/pkg/control/movement"
+	"elevatorlab/pkg/hra"
 	"time"
 )
 
 var Elevator common.Elevator
 var StateChan = make(chan common.ElevatorBehaviour)
-var OrderComplete = make(chan elevio.ButtonEvent) //tracks completed requests
 var DoorOpenChan = make(chan struct{})
 var DoorCloseChan = make(chan struct{})
 
@@ -59,13 +59,18 @@ func executionLoop() {
 			elevio.SetFloorIndicator(floor)
 
 			if movement.RequestShouldStop(Elevator) {
-				movement.StopElevator()
-				handleFloorArrival()
+				movement.StopElevator() //??
+				Elevator.Behaviour = common.DOOR_OPEN
+				Elevator.Dirn = elevio.MD_Stop
+
+				movement.ClearRequestAtCurrentFloor(&Elevator)
+				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+
+				DoorOpenChan <- struct{}{}
 			}
 
-		case <-OrderComplete:
-			dispatcher.ClearRequests(Elevator)
-			StateChan <- common.IDLE
+		case <-DoorCloseChan:
+			StateChan <-common.IDLE
 		}
 	}
 }
@@ -78,20 +83,16 @@ func handleButtonPress(buttonPress elevio.ButtonEvent) {
 		backup.SaveCabRequests(Elevator)
 	}
 
-	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-
+	if Elevator.Behaviour == common.DOOR_OPEN &&
+		movement.ShouldClearImmediately(Elevator, buttonPress.Floor, buttonPress.Button){
+			movement.ClearRequestAtCurrentFloor(&Elevator)
+			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+			DoorOpenChan <- struct{}{}
+	}
+		
 	if Elevator.Behaviour == common.IDLE {
 		StateChan <- common.MOVING
 	}
-}
-
-func handleFloorArrival() {
-	Elevator.Behaviour = common.DOOR_OPEN
-	DoorOpenChan <- struct{}{} //start door FSM
-	<-DoorCloseChan            //wait for door to close
-	dispatcher.ClearRequests(Elevator)
-	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-	StateChan <- common.IDLE
 }
 
 func handleState() {
@@ -101,26 +102,21 @@ func handleState() {
 	case common.MOVING:
 		handleMovingState()
 	case common.DOOR_OPEN:
-		handleDoorOpenState()
+		// No-op since we have a door fsm
 	}
 }
 
 func handleIdleState() {
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		for button := 0; button < 2; button++ {
-			if GetOrderState(floor, button) == common.HalfExisting {
-				return // Wait for confirmation
-			}
-		}
+	hraInput := hra.CreateHRAInput(dispatcher.ElevatorStates, dispatcher.hallRequestsBool())
+	hraOutput, err := hra.ProcessElevatorRequests(hraInput)
+	if err == nil {
+		Elevator = hra.HRAMapToElevator(hraOutput, Elevator)
 	}
-
 	nextDirn := dispatcher.ChooseDirection(Elevator)
-	if nextDirn.Behaviour == common.MOVING {
-		Elevator.Behaviour = common.MOVING
-		Elevator.Dirn = nextDirn.Dirn
-	}
-	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+	Elevator.Dirn = nextDirn.Dirn
+	StateChan <- nextDirn.Behaviour
 }
+
 
 
 func handleMovingState() {
@@ -134,7 +130,7 @@ func handleMovingState() {
 				movement.StopElevator()
 				DoorOpenChan <- struct{}{} 
 				<-DoorCloseChan
-				dispatcher.ClearRequests(Elevator)
+				movement.ClearRequestAtCurrentFloor(&Elevator)
 				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 				StateChan <- common.IDLE
 				return
@@ -143,15 +139,6 @@ func handleMovingState() {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
-
-func handleDoorOpenState() {
-	DoorOpenChan <- struct{}{} //trigger door open
-	<-DoorCloseChan            //wait till it closes
-	dispatcher.ClearRequests(Elevator)
-	indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-	StateChan <- common.IDLE
-}
-
 
 
 func UpdateOrderState(floor int, button int, state common.OrderState) {
