@@ -1,7 +1,7 @@
 package main
 
 import (
-	"elevatorlab/elevator"
+	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/fsm"
 	"elevatorlab/requests"

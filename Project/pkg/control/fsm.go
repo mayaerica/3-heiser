@@ -4,14 +4,17 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
+	"elevatorlab/pkg/control/dispatcher"
+	"elevatorlab/pkg/control/indicators"
+	"elevatorlab/pkg/control/movement"
 	"time"
-	"strconv"
 )
-
 
 var Elevator common.Elevator
 var StateChan = make(chan common.ElevatorBehaviour)
-var OrderComplete = make(chan elevio.ButtonEvent) // NEW: Tracks completed requests
+var OrderComplete = make(chan elevio.ButtonEvent) //tracks completed requests
+var DoorOpenChan = make(chan struct{})
+var DoorCloseChan = make(chan struct{})
 
 func InitFSM(elevatorID int) {
 	Elevator = common.Elevator{
@@ -19,8 +22,12 @@ func InitFSM(elevatorID int) {
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
 		ClearRequestVariant: common.CV_All,
+		DoorOpenDuration:    3000,
 	}
+
 	backup.LoadCabRequests(&Elevator)
+
+	go indicators.DoorFSM(DoorOpenChan, DoorCloseChan, time.Duration(Elevator.DoorOpenDuration)*time.Millisecond)
 	go StateMachineLoop()
 	go executionLoop()
 }
@@ -51,7 +58,6 @@ func executionLoop() {
 			Elevator.Floor = floor
 			elevio.SetFloorIndicator(floor)
 
-			// Stop at the floor if necessary
 			if movement.RequestShouldStop(Elevator) {
 				movement.StopElevator()
 				handleFloorArrival()
@@ -66,6 +72,11 @@ func executionLoop() {
 
 func handleButtonPress(buttonPress elevio.ButtonEvent) {
 	dispatcher.AssignRequest(buttonPress.Floor, buttonPress.Button, Elevator.ID)
+	Elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
+
+	if buttonPress.Button == elevio.BT_Cab {
+		backup.SaveCabRequests(Elevator)
+	}
 
 	if Elevator.Behaviour == common.IDLE {
 		StateChan <- common.MOVING
@@ -74,13 +85,9 @@ func handleButtonPress(buttonPress elevio.ButtonEvent) {
 
 func handleFloorArrival() {
 	Elevator.Behaviour = common.DOOR_OPEN
-	elevio.SetDoorOpenLamp(true)
-	time.Sleep(Elevator.DoorOpenDuration)
-	elevio.SetDoorOpenLamp(false)
-
-	// Clear the request based on direction
+	DoorOpenChan <- struct{}{} //start door FSM
+	<-DoorCloseChan            //wait for door to close
 	dispatcher.ClearRequests(Elevator)
-
 	StateChan <- common.IDLE
 }
 
@@ -95,13 +102,11 @@ func handleState() {
 	}
 }
 
-// Wait for new request or HRA assignment
 func handleIdleState() {
-	// Wait for full confirmation before assigning requests
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		for button := 0; button < 2; button++ {
 			if GetOrderState(floor, button) == common.HalfExisting {
-				return // Wait for confirmation before acting
+				return // Wait for confirmation
 			}
 		}
 	}
@@ -113,7 +118,7 @@ func handleIdleState() {
 	}
 }
 
-// Move until reaching a request
+
 func handleMovingState() {
 	for {
 		newFloor := elevio.GetFloor()
@@ -123,10 +128,7 @@ func handleMovingState() {
 
 			if movement.RequestShouldStop(Elevator) {
 				movement.StopElevator()
-				elevio.SetDoorOpenLamp(true)
 				Elevator.Behaviour = common.DOOR_OPEN
-				time.Sleep(Elevator.DoorOpenDuration)
-				dispatcher.ClearRequests(Elevator)
 				StateChan <- common.IDLE
 				return
 			}
@@ -135,14 +137,10 @@ func handleMovingState() {
 	}
 }
 
-// hold door open, then determine next action
-
 func handleDoorOpenState() {
-	elevio.SetDoorOpenLamp(true)
-	time.Sleep(Elevator.DoorOpenDuration)
-	elevio.SetDoorOpenLamp(false)
+	DoorOpenChan <- struct{}{} //trigger door open
+	<-DoorCloseChan            //wait till it closes
 
-	// Only clear if fully confirmed
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		for button := 0; button < 2; button++ {
 			if GetOrderState(floor, button) == common.Existing {
@@ -154,19 +152,13 @@ func handleDoorOpenState() {
 	StateChan <- common.IDLE
 }
 
-func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType) {
-	dispatcher.AssignRequest(btn_floor, btn_type, Elevator.ID)
-	Elevator.Requests[btn_floor][btn_type] = true
-	if btn_type == elevio.BT_Cab {
-		backup.SaveCabRequests(Elevator)
-	}
-}
 
-func UpdateOrderState(floor int, button int, state OrderState) {
+
+func UpdateOrderState(floor int, button int, state common.OrderState) {
 	common.GlobalPerspective.Perspective[floor][button] = state
 }
 
-func GetOrderState(floor int, button int) OrderState {
+func GetOrderState(floor int, button int) common.OrderState {
 	return common.GlobalPerspective.Perspective[floor][button]
 }
 
@@ -183,23 +175,3 @@ func ClearHallRequest(floor int, button int) {
 	}
 }
 
-func handleDoorOpenState() {
-	elevio.SetDoorOpenLamp(true)
-	doorTimeout := time.After(Elevator.DoorOpenDuration)
-
-	for {
-		select {
-		case obstructed := <-elevio.PollObstructionSwitch():
-			if obstructed {
-				doorTimeout = time.After(Elevator.DoorOpenDuration) // Restart timer
-			}
-
-		case <-doorTimeout:
-			if !elevio.GetObstructionSwitch() {
-				elevio.SetDoorOpenLamp(false)
-				StateChan <- common.IDLE
-				return
-			}
-		}
-	}
-}

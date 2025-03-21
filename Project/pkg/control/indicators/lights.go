@@ -1,4 +1,4 @@
-package control
+package indicators
 
 import (
 	"elevatorlab/common"
