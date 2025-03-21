@@ -14,9 +14,15 @@ import (
 var mutex sync.Mutex
 var ElevatorStates map[int]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
+var AssignedTo [common.N_FLOORS][2]int
 
 func InitDispatcher() {
 	ElevatorStates = make(map[int]common.Elevator)
+	for f:= 0; f<common.N_FLOORS, f++{
+		for b:=0;b<2;b++{
+			AssignedTo[f][b] = -1
+		}
+	}
 	go Synchronizer()
 }
 
@@ -63,11 +69,20 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 		return false
 	}
 	
-	if floorAssignments, ok := hraOutput[elevatorID]; ok {
-		if floorAssignments[floor][button] {
-			UpdateOrderState(floor, button, common.Existing)
-			ElevatorStates[elevatorID].Requests[floor][button] = true
-			return true
+	mutex.Lock()
+	defer mutex.Unlock()
+	for id, floorAssignments := range hraOutput {
+		for f, btns := range floorAssignments {
+			for b, assigned := range btns {
+				if assigned {
+					AssignedTo[f][b] = id
+					if id == elevatorID && f == floor && b == int(button) {
+						HallRequests[f][b] = common.Existing
+						ElevatorStates[elevatorID].Requests[f][b] = true
+						return true
+					}
+				}
+			}
 		}
 	}
 	return false
@@ -97,6 +112,36 @@ func Synchronizer() {
 				}
 			}
 			mutex.Unlock()
+		case peers := <-peerUpdateChan:
+			mutex.Lock()
+			lost := make(map[int]bool)
+			exisiting := make(map[int]bool)
+			for _, p := range peers.Peers{
+				id := parseID(p)
+				existing[id] = true
+			}
+
+			for id := range ElevatorStates {
+				if !existing[id] {
+					lost[id] = true
+				}
+			}
+			for id := range lost {
+				delete(ElevatorStates, id)
+			}
+			for f:= 0; f<common.N_FLOORS;f++{
+				for b:= 0; b< 2; b++{
+					if lost[AssignedTo[f][b]] && HallRequests[f][b] ==common.Existing{
+						HallRequests[f][b] = common.HalfExisting
+						AssignedTo[f][b] = -1
+					}
+				}
+			}
+			mutex.Unlock()
+
+			//reassign
+			hraInput := hra.CreateHRAInput(ElevatorStates,HallRequestsToBool())
+			hra.ProcessElevatorRequests(hraInput)
 
 		case <-ticker.C:
 			perspectiveTx <- common.Perspective{Perspective: HallRequests}
