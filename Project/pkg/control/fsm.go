@@ -5,8 +5,8 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
 	"elevatorlab/pkg/control/indicators"
-	"time"
 	"fmt"
+	"time"
 )
 
 var Elevator common.Elevator
@@ -50,27 +50,33 @@ func executionLoop() {
 	go elevio.PollFloorSensor(floorSensorChan)
 
 	go func() {
-		ticker := time.NewTicker(5*time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
 			PrintElevatorState()
 		}
 	}()
-	
+
 	for {
 		select {
 		case buttonPress := <-buttonPressChan:
 			handleButtonPress(buttonPress)
-		
-		case assignedBtn:= <-AssignedHallCallChan:
-			Elevator.Requests[assignedBtn.Floor][assignedBtn.Button] = true
+
+		case call := <-AssignedHallCallChan:
+			Elevator.Requests[call.Floor][call.Button] = true
 			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+
+			if Elevator.Behaviour == common.IDLE {
+				dirnPair := ChooseDirection(Elevator)
+				Elevator.Dirn = dirnPair.Dirn
+				StateChan <- dirnPair.Behaviour
+			}
 
 		case floor := <-floorSensorChan:
 			Elevator.Floor = floor
 			elevio.SetFloorIndicator(floor)
 
 			if RequestShouldStop(Elevator) {
-				StopElevator() 
+				StopElevator()
 				Elevator.Behaviour = common.DOOR_OPEN
 				Elevator.Dirn = elevio.MD_Stop
 				ClearRequestsAtCurrentFloor(&Elevator)
@@ -79,24 +85,31 @@ func executionLoop() {
 			}
 
 		case <-DoorCloseChan:
-			next:=ChooseDirection(Elevator)
+			next := ChooseDirection(Elevator)
 			Elevator.Dirn = next.Dirn
 			StateChan <- next.Behaviour
 		}
 	}
 }
 
+// OnRequestButtonPress:
 func handleButtonPress(buttonPress elevio.ButtonEvent) {
-	if buttonPress.Button == elevio.BT_Cab {
+	switch buttonPress.Button {
+	case elevio.BT_Cab:
 		Elevator.Requests[buttonPress.Floor][elevio.BT_Cab] = true
 		backup.SaveCabRequests(Elevator)
 		indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-	} else {
-		HallCallRequestChan <- buttonPress
-	}
 
-	if Elevator.Behaviour == common.IDLE {
-		StateChan <- common.MOVING
+		//if idle -> trigger fsm
+		if Elevator.Behaviour == common.IDLE {
+			dirnPair := ChooseDirection(Elevator)
+			Elevator.Dirn = dirnPair.Dirn
+			StateChan <- dirnPair.Behaviour
+		}
+
+	case elevio.BT_HallUp, elevio.BT_HallDown:
+		//forward hall calls to dispatcher
+		HallCallRequestChan <- buttonPress
 	}
 }
 
@@ -141,8 +154,8 @@ func handleMovingState() {
 func PrintElevatorState() {
 	fmt.Println("========= Elevator State =========")
 	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
-				Elevator.ID, Elevator.Floor, Elevator.Dirn, Elevator.Behaviour)
-	
+		Elevator.ID, Elevator.Floor, Elevator.Dirn, Elevator.Behaviour)
+
 	fmt.Println("Requests: ")
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
@@ -153,4 +166,4 @@ func PrintElevatorState() {
 		)
 	}
 	fmt.Println("==================================")
-}	
+}
