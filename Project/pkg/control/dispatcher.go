@@ -49,7 +49,7 @@ func HallRequestsToBool() [common.N_FLOORS][2]bool {
 	defer mutex.Unlock()
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		for btn := 0; btn < 2; btn++ {
-			out[floor][btn] = HallRequests[floor][btn] != common.NonExisting && HallRequests[floor][btn] != common.Unknown
+			out[floor][btn] = HallRequests[floor][btn] != common.NotRequested && HallRequests[floor][btn] != common.Unknown
 		}
 	}
 	return out
@@ -57,8 +57,8 @@ func HallRequestsToBool() [common.N_FLOORS][2]bool {
 
 func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	mutex.Lock()
-	if HallRequests[floor][button] == common.NonExisting || HallRequests[floor][button] == common.Unknown {
-		HallRequests[floor][button] = common.HalfExisting
+	if HallRequests[floor][button] == common.NotRequested || HallRequests[floor][button] == common.Unknown {
+		HallRequests[floor][button] = common.Unassigned
 	}
 	mutex.Unlock()
 
@@ -70,7 +70,7 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	
 	if floorAssignments, ok := hraOutput[elevatorID]; ok {
 		if floorAssignments[floor][button]{
-			UpdateOrderState(floor, int(button), common.Existing)
+			UpdateOrderState(floor, int(button), common.Assigned)
 			elevator := ElevatorStates[elevatorID]
 			elevator.Requests[floor][button] = true
 			ElevatorStates[elevatorID] = elevator
@@ -99,8 +99,8 @@ func Synchronizer() {
 			mutex.Lock()
 			for floor := 0; floor < common.N_FLOORS; floor++{
 				for btn:=0; btn<2;btn++{
-					if msg.Perspective[floor][btn] == common.Existing{
-						HallRequests[floor][btn] = common.Existing
+					if msg.Perspective[floor][btn] == common.Assigned{
+						HallRequests[floor][btn] = common.Assigned
 					}
 				}
 			}

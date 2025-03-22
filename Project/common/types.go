@@ -35,10 +35,10 @@ type DirnBehaviourPair struct {
 type OrderState int
 
 const (
-	NonExisting OrderState = iota
-	HalfExisting
-	Existing
-	Unknown
+	Unknown OrderState = iota
+	NotRequested //no button press
+	Unassigned   //button press known, but needs to be assigned
+	Assigned     //while this request has been assigned
 )
 
 type Perspective struct {
