@@ -7,6 +7,14 @@ import (
 	"sync"
 )
 
+
+type CallUpdate struct {
+    Floor int
+	Button int
+	HandledBy string
+	Delete bool
+}
+
 var Mu5 sync.Mutex
 
 type DirnBehaviourPair struct {
@@ -46,6 +54,7 @@ func requestsHere(e elevator.Elevator) bool {
 		if e.Requests[e.Floor][btn] {
 			return true
 		}
+		fmt.Print()
 	}
 	return false
 }
@@ -132,51 +141,113 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {  
+func ClearAtCurrentFloor(e elevator.Elevator, requestUpdatesChan chan CallUpdate) {  
 	//locksDone, Request and hallcall from D file 
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
 		for btn := 0; btn < elevator.N_BUTTONS; btn++ {
-			e.Requests[e.Floor][btn] = false
+			//clears all floors for all elvevators (in theory)
+			requestUpdatesChan <- CallUpdate{
+				Floor: e.Floor,
+				Button: btn,
+				HandledBy: "Done",
+				Delete: true,
+			}
 		}
 	case elevator.CV_InDirn:
-		e.Requests[e.Floor][elevio.BT_Cab] = false
+		fmt.Println("oh ye")
+		//sets cab false
+		requestUpdatesChan <- CallUpdate{
+			Floor: e.Floor,
+			Button: 2,
+			HandledBy: "Done",
+			Delete: true,
+		}
+		fmt.Println(1)
 		switch e.Dirn {
 		case elevio.MD_Up:
+			//If elevator not continuing up, set down button to false
 			if !requestsAbove(e) && !e.Requests[e.Floor][elevio.BT_HallUp] {
-				e.Requests[e.Floor][elevio.BT_HallDown] = false
-				e.HallCalls[e.Floor][elevio.BT_HallDown] = false
-				e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
+				requestUpdatesChan <- CallUpdate{
+					Floor: e.Floor,
+					Button: 0,
+					HandledBy: "Done",
+					Delete: true,
+				}
+
+				//e.Requests[e.Floor][elevio.BT_HallDown] = false
+				//e.HallCalls[e.Floor][elevio.BT_HallDown] = false
+				//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
 			}
-			e.Requests[e.Floor][elevio.BT_HallUp] = false
-			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
+
+			//Set up request to false
+
+			requestUpdatesChan <- CallUpdate{
+				Floor: e.Floor,
+				Button: 1,
+				HandledBy: "Done",
+				Delete: true,
+			}
+
+
+			//e.Requests[e.Floor][elevio.BT_HallUp] = false
+			//e.HallCalls[e.Floor][elevio.BT_HallUp] = false
 			//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
 
 		case elevio.MD_Down:
+			//If elevator not continuing down, set up button to false
 			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.BT_HallDown] {
-				e.Requests[e.Floor][elevio.BT_HallUp] = false
-				e.HallCalls[e.Floor][elevio.BT_HallUp] = false
-				e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
+				requestUpdatesChan <- CallUpdate{
+					Floor: e.Floor,
+					Button: 1,
+					HandledBy: "Done",
+					Delete: true,
+				}
+
+				//e.Requests[e.Floor][elevio.BT_HallUp] = false
+				//e.HallCalls[e.Floor][elevio.BT_HallUp] = false
+				//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
 			}
-			e.Requests[e.Floor][elevio.BT_HallDown] = false
-			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
+
+			//Set up down to false
+			requestUpdatesChan <- CallUpdate{
+				Floor: e.Floor,
+				Button: 0,
+				HandledBy: "Done",
+				Delete: true,
+			}
+			
+			//e.Requests[e.Floor][elevio.BT_HallDown] = false
+			//e.HallCalls[e.Floor][elevio.BT_HallDown] = false
 			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
-			fmt.Print()
+
 		case elevio.MD_Stop:
 			fallthrough
 		default:
-			e.Requests[e.Floor][elevio.BT_HallUp] = false
-			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			//If elevator is idle, set both buttons to false
+			requestUpdatesChan <- CallUpdate{
+				Floor: e.Floor,
+				Button: 0,
+				HandledBy: "Done",
+				Delete: true,
+			}
+			requestUpdatesChan <- CallUpdate{
+				Floor: e.Floor,
+				Button: 1,
+				HandledBy: "Done",
+				Delete: true,
+			}
+			//e.Requests[e.Floor][elevio.BT_HallUp] = false
+			//e.Requests[e.Floor][elevio.BT_HallDown] = false
 
-			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
-			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
+			//e.HallCalls[e.Floor][elevio.BT_HallUp] = false
+			//e.HallCalls[e.Floor][elevio.BT_HallDown] = false
 
-			e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
-			e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done" //These are usually turned of if its idle, but it kinda ruins for the other elevators
+			//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
+			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done" //These are usually turned of if its idle, but it kinda ruins for the other elevators
 
 
 		}
 	default:
 	}
-	return e
 }

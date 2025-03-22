@@ -2,19 +2,21 @@ package messageProcessing
 
 import (
 	"elevatorlab/elevator"
-    "elevatorlab/fsm"
+	"elevatorlab/fsm"
+	"elevatorlab/requests"
+
 	//"elevatorlab/requests"
-    "time"
 	"elevatorlab/network/peers"
 	"fmt"
-    "sync"
+	"sync"
+	"time"
 )
 
 
 var printMessageCounter = 0
 
 var Mu2 sync.Mutex // used to lock ElevatorStatus
-
+var ActiveMu sync.Mutex
 //store last received messages & timestamps
 var ElevatorStatus = map[string]bool{
 	"8081": false, // Elevator 1 initially active
@@ -70,21 +72,23 @@ func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message){
                 ElevatorStatus[p.Lost[elevator]]=false
                 
             }
-
+            ActiveMu.Lock()
             if len (p.New)!=0{
                 ElevatorStatus[p.New]=true
             }
+            ActiveMu.Unlock()
 
             Mu2.Unlock()
 
             default:
-                
+                requests.Mu5.Lock()
                 msg := Message{
                     Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
                     Active1:       ElevatorStatus["8081"], 
                     Active2:       ElevatorStatus["8082"],
                     Active3:       ElevatorStatus["8083"],
                 }
+                requests.Mu5.Unlock()
                 messageTx <- msg
                 time.Sleep(10 * time.Millisecond)
             }

@@ -11,6 +11,7 @@ import (
 	"elevatorlab/network/localip"
 	"elevatorlab/network/peers"
 	"elevatorlab/timer"
+	"runtime"
 	"fmt"
 	"os"
 	"time"
@@ -18,7 +19,7 @@ import (
 
 )
 
-
+var lastTask string
 /*
 Hanled by, requests, done and hallcalls are handled twice. Once by resourcemanager and once by UpdateElevatorHallCallsAndButtonLamp. 
 This should be fixed so that only one of them needs to set a value false when needed.
@@ -31,7 +32,19 @@ const (
 	baseBcastPort = 16000
 )
 
+
+func dumpGoroutineStack(debug bool) {
+	// Dump all goroutine stack traces
+	buf := make([]byte, 1<<20) // 1MB buffer
+	n := runtime.Stack(buf, true)
+	if debug {
+		fmt.Printf("Goroutine dump:\n%s\n", string(buf[:n]))
+	}
+	
+}
+
 func main() {
+	debug := false
 	id:= flag.String("id","8081","Elevator ID")
 	port:= flag.String("port","15657","Elavator port")
 	flag.Parse()
@@ -50,6 +63,7 @@ func main() {
 	peerTxEnable := make(chan bool)
 	messageTx := make(chan messageProcessing.Message)
 	messageRx := make(chan messageProcessing.Message)
+	
 
 	//initializing communication for each elevator
 	for i := 1; i <= numElevators; i++ {
@@ -98,56 +112,68 @@ func main() {
 	//channels
 	//updateHallCallsChan := make(chan resource.HallCallUpdate)
 	//updateHandledByChan := make(chan resource.HandledByUpdate)
-	requestChan := make(chan requests.Request, numElevators*5)
-	assignChan := make(chan requests.Request, numElevators*5)
 	BtnEventChan := make(chan elevio.ButtonEvent)
 	FloorChan := make(chan int)
 	ObstuctionChan := make(chan bool)
 	StopChan := make(chan bool)
 	TimerStartChan := make(chan time.Duration)
+	callUpdatesChan := make(chan requests.CallUpdate)
+	requestUpdatesChan := make(chan requests.CallUpdate)
 
-	go resource.ResourceManager(requestChan, assignChan, TimerStartChan)
+	go resource.ResourceManager(TimerStartChan, callUpdatesChan, requestUpdatesChan)
 	go elevio.PollButtons(BtnEventChan)
 	go elevio.PollFloorSensor(FloorChan)
 	go elevio.PollObstructionSwitch(ObstuctionChan)
 	go elevio.PollStopButton(StopChan)
 	go timer.Start(maintimer, TimerStartChan)
-	go resource.RequestUpdater(TimerStartChan)
-
+	go resource.RequestUpdater(TimerStartChan, callUpdatesChan, requestUpdatesChan)
+	go resource.UpdateElevator(callUpdatesChan, TimerStartChan, requestUpdatesChan)
 
 	ticker := time.NewTicker(UpdateInterval)
 	defer ticker.Stop()
+
+
 	
-	
+
+	go dumpGoroutineStack(debug)
 
 	//continously updating messages:
 	go messageProcessing.UpdateMessage(peerUpdateCh, messageTx)
 
 	elevio.SetDoorOpenLamp(false) //I am unsure why this is needed but it works. When initializing on first floor without this, door light is on.
 	//event loop
-	
+	fmt.Println("start")
 	for {
-		// fmt.Println("still alive")
+		fmt.Println(lastTask)
+		resource.PrintElevators()
+		//fmt.Println("still alive")
 		select {
 		case btn := <-BtnEventChan:
-			// fmt.Println("1")
+			lastTask ="ButtonEvent"
+			
 			if btn.Button != elevio.BT_Cab {
 				if !fsm.Elevator.HallCalls[btn.Floor][btn.Button] {
-					requestChan <- requests.Request{FloorButton: btn, HandledBy: -1}
+					callUpdatesChan <- requests.CallUpdate{
+						Floor: btn.Floor,
+						Button: int(btn.Button),
+						HandledBy: "",
+						Delete: false,
+					}
 					fsm.Elevator.HallCalls[btn.Floor][btn.Button] = true
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					}
 				} else {
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
-					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
+					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan, requestUpdatesChan)
 				}
 				
 		case floor := <-FloorChan:
+			lastTask = "FloorEvent"
 			// fmt.Println("2")
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
-				fsm.OnFloorArrival(floor, TimerStartChan)
+				fsm.OnFloorArrival(floor, TimerStartChan, requestUpdatesChan)
 			}
 
 		case obstructed := <-ObstuctionChan:
@@ -158,6 +184,7 @@ func main() {
 				TimerStartChan <- fsm.Elevator.DoorOpenDuration
 			}
 		case <-StopChan:
+			lastTask = "StopButton"
 			// fmt.Println("4")
 			for f:=0; f < elevator.N_FLOORS; f++ {
 				for b := elevio.ButtonType(0); b < 3; b++ {
@@ -167,20 +194,24 @@ func main() {
 
 		
 		case <-maintimer.C:
-			fmt.Println("5")
-			fsm.OnDoorTimeout(TimerStartChan)
+			lastTask = "DoorTimeout"
+			fsm.OnDoorTimeout(TimerStartChan,requestUpdatesChan)
 
 		
 		case <-ticker.C:
+			
 			// fmt.Println("6")
-			resource.PrintElevators()
+			//resource.PrintElevators()
+			//fmt.Println("last task: ", lastTask)
+			lastTask = "Update"
 	
 
 		case msg := <-messageRx:
+			lastTask += "M"
 			// fmt.Println("7")
 			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
 			//fmt.Println("\n\n\n\n\n 7 \n\n\n\n\n")
-			resource.UpdateElevatorHallCallsAndButtonLamp(msg, requestChan, TimerStartChan)
+			resource.UpdateFromMessage(msg, callUpdatesChan)
 
 		
 		}

@@ -27,7 +27,7 @@ func setAllLights(e elevator.Elevator) {
 } 
 
 
-func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
+func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
 		if requests.ShouldClearImmediatley(Elevator, btn_floor, btn_type) { 
@@ -53,7 +53,7 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 		case elevator.DOOR_OPEN:
 			elevio.SetDoorOpenLamp(true)
 			timer_start <- Elevator.DoorOpenDuration   
-			Elevator = requests.ClearAtCurrentFloor(Elevator)
+			requests.ClearAtCurrentFloor(Elevator, requestUpdatesChan)
 		case elevator.MOVING:
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(Elevator.Dirn)
@@ -67,17 +67,18 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 }
 
 
-func OnFloorArrival(newFloor int, timer_start chan time.Duration) {
+func OnFloorArrival(newFloor int, timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
+	requests.Mu5.Lock()
+	defer requests.Mu5.Unlock()
 	Elevator.Floor = newFloor
 	elevio.SetFloorIndicator(Elevator.Floor)
 
-	requests.Mu5.Lock()
 	switch Elevator.Behaviour {
 	case elevator.MOVING:
 		if requests.RequestShouldStop(Elevator) {
 			elevio.SetMotorDirection(elevio.MD_Stop) 
 			elevio.SetDoorOpenLamp(true)
-			Elevator = requests.ClearAtCurrentFloor(Elevator)
+			requests.ClearAtCurrentFloor(Elevator,requestUpdatesChan)
 			timer_start <- Elevator.DoorOpenDuration 
 			setAllLights(Elevator)
 			Elevator.Behaviour = elevator.DOOR_OPEN
@@ -85,29 +86,29 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration) {
 	default:
 		break
 	}
-	requests.Mu5.Unlock()
 }
 
-func OnDoorTimeout(timer_start chan time.Duration) {
+func OnDoorTimeout(timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
 		if elevio.GetObstruction() {
 			fmt.Println("obstruction")  //fix     
 			break
 		}
-
+		
 		elevio.SetDoorOpenLamp(false)
 
 		var pair requests.DirnBehaviourPair
 		pair = requests.ChooseDirection(Elevator)
 		requests.Mu5.Lock()
+		defer requests.Mu5.Unlock()
 		Elevator.Dirn = pair.Dirn
 		Elevator.Behaviour = pair.Behaviour
 
 		switch Elevator.Behaviour {
 		case elevator.DOOR_OPEN:
 			timer_start <- Elevator.DoorOpenDuration
-			Elevator = requests.ClearAtCurrentFloor(Elevator)
+			requests.ClearAtCurrentFloor(Elevator, requestUpdatesChan)
 			setAllLights(Elevator)
 
 		case elevator.MOVING:
@@ -120,7 +121,7 @@ func OnDoorTimeout(timer_start chan time.Duration) {
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(Elevator.Dirn)
 		}
-		requests.Mu5.Unlock()
+		
 	default:
 		break
 
