@@ -6,15 +6,14 @@ import (
 	"elevatorlab/pkg/hra"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
 )
 
 var mutex sync.Mutex
 var ElevatorStates map[int]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
-
 
 func InitDispatcher() {
 	ElevatorStates = make(map[int]common.Elevator)
@@ -31,7 +30,7 @@ func UpdateLocalElevatorState(e common.Elevator) {
 	mutex.Unlock()
 }
 
-func UpdateOrderState(floor int, button int, state common.OrderState){
+func UpdateOrderState(floor int, button int, state common.OrderState) {
 	mutex.Lock()
 	HallRequests[floor][button] = state
 	mutex.Unlock()
@@ -67,21 +66,18 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	if floorAssignments, ok := hraOutput[elevatorID]; ok {
-		if floorAssignments[floor][button]{
+		if floorAssignments[floor][button] {
 			UpdateOrderState(floor, int(button), common.Assigned)
 			elevator := ElevatorStates[elevatorID]
 			elevator.Requests[floor][button] = true
 			ElevatorStates[elevatorID] = elevator
 			return true
-		}//fix this one
+		} //fix this one
 	}
 	return false
 }
-
-
-
 
 func Synchronizer() {
 	perspectiveTx := make(chan common.Perspective)
@@ -95,17 +91,17 @@ func Synchronizer() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
-		case msg:= <-perspectiveRx:
+		case msg := <-perspectiveRx:
 			mutex.Lock()
-			for floor := 0; floor < common.N_FLOORS; floor++{
-				for btn:=0; btn<2;btn++{
-					if msg.Perspective[floor][btn] == common.Assigned{
+			for floor := 0; floor < common.N_FLOORS; floor++ {
+				for btn := 0; btn < 2; btn++ {
+					if msg.Perspective[floor][btn] == common.Assigned {
 						HallRequests[floor][btn] = common.Assigned
 					}
 				}
 			}
 			mutex.Unlock()
-		
+
 		case <-ticker.C:
 			perspectiveTx <- common.Perspective{Perspective: HallRequests}
 		}
@@ -125,16 +121,14 @@ func ChooseDirection(e common.Elevator) common.DirnBehaviourPair {
 	return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 }
 
-//listener loop
-func StartDispatcherLoop(localElevID int, requestChan <- chan elevio.ButtonEvent, assignChan chan <- elevio.ButtonEvent){
-	go func(){
+// listener loop
+func StartDispatcherLoop(localElevID int, requestChan <-chan elevio.ButtonEvent, assignChan chan<- elevio.ButtonEvent) {
+	go func() {
 		for btn := range requestChan {
 			success := AssignRequest(btn.Floor, btn.Button, localElevID)
 			if success {
 				assignChan <- btn
 			}
 		}
-	} ()
+	}()
 }
-
-
