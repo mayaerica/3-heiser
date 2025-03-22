@@ -17,12 +17,27 @@ var HallCallRequestChan = make(chan elevio.ButtonEvent)
 var AssignedHallCallChan = make(chan elevio.ButtonEvent)
 
 func InitFSM(elevatorID string) {
+	detectedFloor := elevio.GetFloor()
+
 	Elevator = common.Elevator{
 		ID:                  elevatorID,
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
+		Floor:               detectedFloor,
 		ClearRequestVariant: common.CV_All,
 		DoorOpenDuration:    3 * time.Second,
+	}
+
+	if detectedFloor == -1 {
+		fmt.Println("Starting inbetween floors -> moving down to find floor..")
+		elevio.SetMotorDirection(elevio.MD_Down)
+		Elevator.Behaviour = common.MOVING
+		Elevator.Dirn = elevio.MD_Down
+	} else {
+		fmt.Print("Starting at floor ", detectedFloor)
+		elevio.SetFloorIndicator(detectedFloor)
+		Elevator.Behaviour = common.IDLE
+		Elevator.Dirn = elevio.MD_Stop
 	}
 
 	backup.LoadCabRequests(&Elevator)
