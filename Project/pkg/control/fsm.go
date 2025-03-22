@@ -62,7 +62,7 @@ func executionLoop() {
 			elevio.SetFloorIndicator(floor)
 
 			if RequestShouldStop(Elevator) {
-				StopElevator() //?? have to make this
+				StopElevator() 
 				Elevator.Behaviour = common.DOOR_OPEN
 				Elevator.Dirn = elevio.MD_Stop
 				ClearRequestsAtCurrentFloor(&Elevator)
@@ -71,7 +71,9 @@ func executionLoop() {
 			}
 
 		case <-DoorCloseChan:
-			StateChan <- common.IDLE
+			next:=ChooseDirection(Elevator)
+			Elevator.Dirn = next.Dirn
+			StateChan <- next.Behaviour
 		}
 	}
 }
