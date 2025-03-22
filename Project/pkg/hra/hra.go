@@ -32,7 +32,7 @@ func CreateHRAInput(states map[int]common.Elevator, hall [common.N_FLOORS][2]boo
 	}
 	
 	for id, elev:= range states{
-		out.States[strconv.Iota(id)] = HRAElevState{
+		out.States[strconv.Itoa(id)] = HRAElevState{
 			Behaviour:    utils.BehaviourToString(elev.Behaviour),
 			Floor:        elev.Floor,
 			Direction:    utils.DirectionToString(elev.Dirn),
