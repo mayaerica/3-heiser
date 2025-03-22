@@ -29,6 +29,7 @@ func setAllLights(e elevator.Elevator) {
 
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
 	requests.Mu5.Lock()
+	fmt.Println("huh\n\n\n\n\n\n\n\n\n\n\n\n\n\n") //deadlock her venter for alltid 
 
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:

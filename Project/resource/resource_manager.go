@@ -227,15 +227,25 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 		select {
 		case updatedRequest := <-requestUpdateChan:
 			requests.Mu5.Lock()  // Lock once for handling the request
-
 			if updatedRequest.Delete {
-				// Handle request deletion
 				fsm.Elevator.Requests[updatedRequest.Floor][updatedRequest.Button] = false
-				// Other logic...
+
+				if updatedRequest.Button != 2 {
+					if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == "Done" {
+						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = ""
+						fsm.Elevator.HallCalls[updatedRequest.Floor][updatedRequest.Button] = false
+						elevio.SetButtonLamp(elevio.ButtonType(updatedRequest.Button), updatedRequest.Floor, false)
+
+					} else if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] != "Unchanged" {
+						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
+					}
+				}
+
 			} else {
-				// Handle request addition
-				fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
-				// Other logic...
+				if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy { 
+					fmt.Println("\n\n\n\n\nYEYEYEYE\n\n\n\n\n\n")
+					fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan)
+				}
 			}
 			requests.Mu5.Unlock()  // Unlock after completing the request logic
 
@@ -287,6 +297,9 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 		for floor := 0; floor < 4; floor++ { 
 			for button := 0; button < 2; button++ {
 				if fsm.Elevator.HandledBy[floor][button] == fsm.Elevator.Id { //Checks if local elevator wants call
+					
+					numActiveElevators = 0
+					
 					if numActiveElevators > 1 {
 						agreedOnFloor := 1
 						for _,elevator := range elevators {
@@ -311,7 +324,7 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 							}
 						}
 					} else {
-						requestUpdateChan <- requests.CallUpdate{
+							requestUpdateChan <- requests.CallUpdate{
 							Floor: floor,
 							Button: button,
 							HandledBy: fsm.Elevator.Id,
