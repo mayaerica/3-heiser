@@ -237,6 +237,7 @@ func UpdateElevator (callUpdatesChan chan CallUpdate, TimerStartChan chan time.D
 }
 */
 
+
 func RequestUpdater (TimerStartChan chan time.Duration){
 	for {
 		// fmt.Printf("str2: %q\n", elevators[1].HandledBy[2][0]) // This prints "8087" (quoted string)
