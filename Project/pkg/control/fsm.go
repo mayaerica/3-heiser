@@ -4,11 +4,7 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
-	"elevatorlab/pkg/control/dispatcher"
 	"elevatorlab/pkg/control/indicators"
-	"elevatorlab/pkg/control/movement"
-	"elevatorlab/pkg/hra"
-	"strconv"
 	"time"
 )
 
@@ -16,8 +12,10 @@ var Elevator common.Elevator
 var StateChan = make(chan common.ElevatorBehaviour)
 var DoorOpenChan = make(chan struct{})
 var DoorCloseChan = make(chan struct{})
+var HallCallRequestChan = make(chan elevio.ButtonEvent)
+var AssignedHallCallChan = make(chan elevio.ButtonEvent)
 
-func InitFSM(elevatorID int) {
+func InitFSM(elevatorID string) {
 	Elevator = common.Elevator{
 		ID:                  elevatorID,
 		Behaviour:           common.IDLE,
@@ -31,7 +29,6 @@ func InitFSM(elevatorID int) {
 	go StateMachineLoop()
 	go executionLoop()
 	go indicators.DoorFSM(DoorOpenChan, DoorCloseChan, Elevator.DoorOpenDuration)
-	go PeriodicHRA()
 }
 
 func StateMachineLoop() {
@@ -55,16 +52,20 @@ func executionLoop() {
 		select {
 		case buttonPress := <-buttonPressChan:
 			handleButtonPress(buttonPress)
+		
+		case assignedBtn:= <-AssignedHallCallChan:
+			Elevator.Requests[assignedBtn.Floor][assignedBtn.Button] = true
+			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 
 		case floor := <-floorSensorChan:
 			Elevator.Floor = floor
 			elevio.SetFloorIndicator(floor)
 
-			if movement.RequestShouldStop(Elevator) {
-				movement.StopElevator() //??
+			if RequestShouldStop(Elevator) {
+				StopElevator() //?? have to make this
 				Elevator.Behaviour = common.DOOR_OPEN
 				Elevator.Dirn = elevio.MD_Stop
-				movement.ClearRequestAtCurrentFloor(&Elevator)
+				ClearRequestsAtCurrentFloor(&Elevator)
 				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 				DoorOpenChan <- struct{}{}
 			}
@@ -76,11 +77,12 @@ func executionLoop() {
 }
 
 func handleButtonPress(buttonPress elevio.ButtonEvent) {
-	dispatcher.UpdateAllLights(buttonPress.Floor, int(buttonPress.Button), common.HalfExisting)
-	Elevator.Requests[buttonPress.Floor][buttonPress.Button] = true
-
 	if buttonPress.Button == elevio.BT_Cab {
+		Elevator.Requests[buttonPress.Floor][elevio.BT_Cab] = true
 		backup.SaveCabRequests(Elevator)
+		indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+	} else {
+		HallCallRequestChan <- buttonPress
 	}
 
 	if Elevator.Behaviour == common.IDLE {
@@ -95,12 +97,12 @@ func handleState() {
 	case common.MOVING:
 		handleMovingState()
 	case common.DOOR_OPEN:
-		// No-op since we have a door fsm
+		// no-op
 	}
 }
 
 func handleIdleState() {
-	nextDirn := dispatcher.ChooseDirection(Elevator)
+	nextDirn := ChooseDirection(Elevator)
 	Elevator.Dirn = nextDirn.Dirn
 	StateChan <- nextDirn.Behaviour
 }
@@ -112,11 +114,11 @@ func handleMovingState() {
 			Elevator.Floor = newFloor
 			elevio.SetFloorIndicator(newFloor)
 
-			if movement.RequestShouldStop(Elevator) {
-				movement.StopElevator()
+			if RequestShouldStop(Elevator) {
+				StopElevator()
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan
-				movement.ClearRequestAtCurrentFloor(&Elevator)
+				ClearRequestsAtCurrentFloor(&Elevator)
 				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 				StateChan <- common.IDLE
 				return
@@ -126,22 +128,4 @@ func handleMovingState() {
 	}
 }
 
-func PeriodicHRA() {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	for {
-		<-ticker.C
-		hraInput := hra.CreateHRAInput(dispatcher.ElevatorStates, dispatcher.HallRequestsToBool())
-		hraOutput, err := hra.ProcessElevatorRequests(hraInput)
-		if err != nil {
-			continue
-		}
-		assigned := hraOutput[strconv.Iota(Elevator.ID)]
-		for floor, buttons := range assigned {
-			for btn, val := range buttons {
-				if val && dispatcher.GetOrderState(floor, btn) == common.HalfExisting{
-					dispatcher.UpdateOrderState(floor, btn, common.Existing)
-				}
-			}
-		}
-	}
-}
+

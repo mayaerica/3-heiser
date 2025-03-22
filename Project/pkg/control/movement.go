@@ -24,6 +24,10 @@ func RequestShouldStop(e common.Elevator) bool {
 	}
 }
 
+func StopElevator() {
+	elevio.SetMotorDirection(elevio.MD_Stop)
+}
+
 func RequestsAbove(e common.Elevator) bool {
 	for f := e.Floor + 1; f < common.N_FLOORS; f++ {
 		for btn := 0; btn < common.N_BUTTONS; btn++ {

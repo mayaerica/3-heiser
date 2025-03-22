@@ -4,31 +4,30 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/hra"
-	"elevatorlab/pkg/control/movement"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
 	"sync"
 	"time"
+	"strconv"
 )
 
 var mutex sync.Mutex
 var ElevatorStates map[int]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
-var HandledBy [common.N_FLOORS][2]int
+
 
 func InitDispatcher() {
 	ElevatorStates = make(map[int]common.Elevator)
-	for f:= 0; f<common.N_FLOORS, f++{
-		for b:=0;b<2;b++{
-			HandledBy[f][b] = -1
-		}
-	}
 	go Synchronizer()
 }
 
 func UpdateLocalElevatorState(e common.Elevator) {
 	mutex.Lock()
-	ElevatorStates[e.ID] = e
+	id, err := strconv.Atoi(e.ID)
+	if err != nil {
+		return
+	} //change this part somehow
+	ElevatorStates[id] = e
 	mutex.Unlock()
 }
 
@@ -69,24 +68,18 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 		return false
 	}
 	
-	mutex.Lock()
-	defer mutex.Unlock()
-	for id, floorAssignments := range hraOutput {
-		for f, btns := range floorAssignments {
-			for b, assigned := range btns {
-				if assigned {
-					HandledBy[f][b] = id
-					if id == elevatorID && f == floor && b == int(button) {
-						HallRequests[f][b] = common.Existing
-						ElevatorStates[elevatorID].Requests[f][b] = true
-						return true
-					}
-				}
-			}
-		}
+	if floorAssignments, ok := hraOutput[elevatorID]; ok {
+		if floorAssignments[floor][button]{
+			UpdateOrderState(floor, int(button), common.Existing)
+			elevator := ElevatorStates[elevatorID]
+			elevator.Requests[floor][button] = true
+			ElevatorStates[elevatorID] = elevator
+			return true
+		}//fix this one
 	}
 	return false
 }
+
 
 
 
@@ -112,37 +105,7 @@ func Synchronizer() {
 				}
 			}
 			mutex.Unlock()
-		case peers := <-peerUpdateChan:
-			mutex.Lock()
-			lost := make(map[int]bool)
-			exisiting := make(map[int]bool)
-			for _, p := range peers.Peers{
-				id := parseID(p)
-				existing[id] = true
-			}
-
-			for id := range ElevatorStates {
-				if !existing[id] {
-					lost[id] = true
-				}
-			}
-			for id := range lost {
-				delete(ElevatorStates, id)
-			}
-			for f:= 0; f<common.N_FLOORS;f++{
-				for b:= 0; b< 2; b++{
-					if lost[HandledBy[f][b]] && HallRequests[f][b] ==common.Existing{
-						HallRequests[f][b] = common.HalfExisting
-						HandledBy[f][b] = -1
-					}
-				}
-			}
-			mutex.Unlock()
-
-			//reassign
-			hraInput := hra.CreateHRAInput(ElevatorStates,HallRequestsToBool())
-			hra.ProcessElevatorRequests(hraInput)
-
+		
 		case <-ticker.C:
 			perspectiveTx <- common.Perspective{Perspective: HallRequests}
 		}
@@ -150,16 +113,28 @@ func Synchronizer() {
 }
 
 func ChooseDirection(e common.Elevator) common.DirnBehaviourPair {
-	if movement.RequestsAbove(e) {
+	if RequestsAbove(e) {
 		return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.MOVING}
 	}
-	if movement.RequestsHere(e) {
+	if RequestsHere(e) {
 		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.DOOR_OPEN}
 	}
-	if movement.RequestsBelow(e) {
+	if RequestsBelow(e) {
 		return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
 	}
 	return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
+}
+
+//listener loop
+func StartDispatcherLoop(localElevID int, requestChan <- chan elevio.ButtonEvent, assignChan chan <- elevio.ButtonEvent){
+	go func(){
+		for btn := range requestChan {
+			success := AssignRequest(btn.Floor, btn.Button, localElevID)
+			if success {
+				assignChan <- btn
+			}
+		}
+	} ()
 }
 
 
