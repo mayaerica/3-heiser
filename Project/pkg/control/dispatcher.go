@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"fmt"
 )
 
 var mutex sync.Mutex
@@ -24,8 +25,10 @@ func UpdateLocalElevatorState(e common.Elevator) {
 	mutex.Lock()
 	id, err := strconv.Atoi(e.ID)
 	if err != nil {
+		fmt.Println("invalid elevator ID: ", e.ID)
+		mutex.Unlock()
 		return
-	} //change this part somehow
+	} 
 	ElevatorStates[id] = e
 	mutex.Unlock()
 }
@@ -64,17 +67,23 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	hraInput := hra.CreateHRAInput(ElevatorStates, HallRequestsToBool())
 	hraOutput, err := hra.ProcessElevatorRequests(hraInput)
 	if err != nil {
+		fmt.Println("HRA error: ", err)
 		return false
 	}
 
 	if floorAssignments, ok := hraOutput[elevatorID]; ok {
 		if floorAssignments[floor][button] {
+			fmt.Println("HRA assigned call to this elevator:",floor,button)
 			UpdateOrderState(floor, int(button), common.Assigned)
 			elevator := ElevatorStates[elevatorID]
 			elevator.Requests[floor][button] = true
 			ElevatorStates[elevatorID] = elevator
 			return true
-		} //fix this one
+		} else {
+			fmt.Println("..")
+		}
+	}else {
+		fmt.Println("HRA did not find elevator ID in output:", elevatorID)
 	}
 	return false
 }
