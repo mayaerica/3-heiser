@@ -6,6 +6,7 @@ import (
 	"elevatorlab/pkg/backup"
 	"elevatorlab/pkg/control/indicators"
 	"time"
+	"fmt"
 )
 
 var Elevator common.Elevator
@@ -48,6 +49,13 @@ func executionLoop() {
 	go elevio.PollButtons(buttonPressChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 
+	go func() {
+		ticker := time.NewTicker(5*time.Second)
+		for range ticker.C {
+			PrintElevatorState()
+		}
+	}()
+	
 	for {
 		select {
 		case buttonPress := <-buttonPressChan:
@@ -130,4 +138,19 @@ func handleMovingState() {
 	}
 }
 
-
+func PrintElevatorState() {
+	fmt.Println("========= Elevator State =========")
+	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
+				Elevator.ID, Elevator.Floor, Elevator.Dirn, Elevator.Behaviour)
+	
+	fmt.Println("Requests: ")
+	for floor := 0; floor < common.N_FLOORS; floor++ {
+		fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
+			floor,
+			Elevator.Requests[floor][elevio.BT_Cab],
+			Elevator.Requests[floor][elevio.BT_HallUp],
+			Elevator.Requests[floor][elevio.BT_HallDown],
+		)
+	}
+	fmt.Println("==================================")
+}	
