@@ -6,45 +6,43 @@ import (
 	"elevatorlab/pkg/network/localip"
 	"fmt"
 	"os"
-	"flag"
-	"strconv"
 )
 
 func main() {
-	id:= flag.String("id","","Elevator ID")
-	port:= flag.String("port","15657","Elavator port")
-	flag.Parse()
+	var myID string
 
-	if *id == ""{
-		fmt.Println("Specify an elevator ID using -id")
-		os.Exit(1)
+	// Usage:
+	//   go run main.go 0        → manually set elevator ID to "0"
+	//   go run main.go --auto   → auto-set ID based on local IP
+
+	if len(os.Args) < 2 {
+		fmt.Println("usage: go run main.go [elevatorID] OR --auto ")
+		return
 	}
 
-	ID, err := strconv.Atoi(*id)
-	if err != nil {
-		fmt.Println("Invalid ID, must be an int")
-		os.Exit(1)
+	if os.Args[1] == "--auto" {
+		ip, err :=localip.LocalIP()
+		if err!=nil{
+			fmt.Println("could not get local IP:", err)
+			return
+		}
+		myID = ip
+	} else {
+		myID = os.Args[1]
 	}
-
-	localIP, err := localip.LocalIP()
-	if err != nil {
-		fmt.Println("Error getting local IP:", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Elevator %s running on IP: %s\n", *id, localIP)
-
-	//func Init(address string, numFloors int)
-	elevio.Init("localhost:" + *port, 4)
 	
-	control.InitDispatcher()
+	fmt.Printf("Elevator starting with ID: %s\n", myID)
+	
+	//func Init(address string, numFloors int)
+	elevio.Init("localhost:15657", elevio.N_FLOORS)
 
+	control.InitFSM(myID)
+	control.InitDispatcher(myID, control.Elevator)
 	go control.StartDispatcherLoop(
-		ID,
+		myID,
 		control.HallCallRequestChan,
 		control.AssignedHallCallChan,
 	)
-
-	control.InitFSM(*id)
 
 	select {}
 }
