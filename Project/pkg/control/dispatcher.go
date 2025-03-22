@@ -6,10 +6,10 @@ import (
 	"elevatorlab/pkg/hra"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
-	"fmt"
 )
 
 var mutex sync.Mutex
@@ -28,7 +28,7 @@ func UpdateLocalElevatorState(e common.Elevator) {
 		fmt.Println("invalid elevator ID: ", e.ID)
 		mutex.Unlock()
 		return
-	} 
+	}
 	ElevatorStates[id] = e
 	mutex.Unlock()
 }
@@ -73,7 +73,7 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 
 	if floorAssignments, ok := hraOutput[elevatorID]; ok {
 		if floorAssignments[floor][button] {
-			fmt.Println("HRA assigned call to this elevator:",floor,button)
+			fmt.Println("HRA assigned call to this elevator:", floor, button)
 			UpdateOrderState(floor, int(button), common.Assigned)
 			elevator := ElevatorStates[elevatorID]
 			elevator.Requests[floor][button] = true
@@ -82,7 +82,7 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 		} else {
 			fmt.Println("..")
 		}
-	}else {
+	} else {
 		fmt.Println("HRA did not find elevator ID in output:", elevatorID)
 	}
 	return false

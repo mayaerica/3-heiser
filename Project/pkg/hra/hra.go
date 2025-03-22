@@ -48,7 +48,7 @@ func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
 		return nil, err
 	}
 
-	exe := "./hall_request_assigner"
+	exe := "Project/pkg/hra/hall_request_assigner/hall_request_assigner"
 	if runtime.GOOS == "windows"{
 		exe += ".exe"
 	}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-module First_Elevator.hall_request_assigner.jsonx;
+module jsonx;
 
 import std.algorithm : find, sort;
 import std.ascii : isControl, isUpper, isDigit, isHexDigit, isWhite;

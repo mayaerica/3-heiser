@@ -17,3 +17,25 @@ go mod tidy
 
 Error: go.mod file not found ->
 check if in correct folder!
+
+If the whole thing freezes:
+the D compiler (dmd) maybe isn't installed on your system yet, 
+so the build.sh script can’t compile hall_request_assigner.
+Linux:
+sudo apt update
+sudo apt install dmd
+dmd --version
+cd Project/pkg/hra/hall_request_assigner
+./build.sh
+then try test manually:
+./hall_request_assigner -h
+
+If you then get the error: E: Unable to locate package dmd ->
+sudo wget https://downloads.dlang.org/releases/2.x/2.105.2/dmd_2.105.2-0_amd64.deb
+sudo dpkg -i dmd_2.105.2-0_amd64.deb
+sudo apt-get install -f
+
+in the end: had to modify the jsonx.d file... now it should work tho
+then,
+cd ElevatorProject/Project
+chmod +x pkg/hra/hall_request_assigner/hall_request_assigner
