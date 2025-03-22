@@ -74,16 +74,14 @@ func executionLoop() {
 	for {
 		select {
 		case buttonPress := <-buttonPressChan:
+			fmt.Printf("[BUTTONPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
 			handleButtonPress(buttonPress)
 
-		case call := <-AssignedHallCallChan:
-			Elevator.Requests[call.Floor][call.Button] = true
+		case assignedBtn := <-AssignedHallCallChan:
+			Elevator.Requests[assignedBtn.Floor][assignedBtn.Button] = true
 			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-
 			if Elevator.Behaviour == common.IDLE {
-				dirnPair := ChooseDirection(Elevator)
-				Elevator.Dirn = dirnPair.Dirn
-				StateChan <- dirnPair.Behaviour
+				StateChan <- common.MOVING
 			}
 
 		case floor := <-floorSensorChan:
@@ -106,6 +104,7 @@ func executionLoop() {
 		}
 	}
 }
+
 
 // OnRequestButtonPress:
 func handleButtonPress(buttonPress elevio.ButtonEvent) {

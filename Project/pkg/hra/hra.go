@@ -25,14 +25,14 @@ type HRAInput struct {
 }
 
 // create HRA input from elevator states and hall requests
-func CreateHRAInput(states map[int]common.Elevator, hall [common.N_FLOORS][2]bool) HRAInput {
+func CreateHRAInput(states map[string]common.Elevator, hall [common.N_FLOORS][2]bool) HRAInput {
 	out := HRAInput{
 		HallRequests: hall,
 		States:       make(map[string]HRAElevState),
 	}
-	
+
 	for id, elev:= range states{
-		out.States[strconv.Itoa(id)] = HRAElevState{
+		out.States[id] = HRAElevState{
 			Behaviour:    utils.BehaviourToString(elev.Behaviour),
 			Floor:        elev.Floor,
 			Direction:    utils.DirectionToString(elev.Dirn),
@@ -42,7 +42,7 @@ func CreateHRAInput(states map[int]common.Elevator, hall [common.N_FLOORS][2]boo
 	return out
 }
 
-func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
+func ProcessElevatorRequests(input HRAInput) (map[string]map[int][2]bool, error) {
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -66,13 +66,12 @@ func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
 	}
 
 	//convert keys to int
-	results:= make(map[int]map[int][2]bool)
+	results:= make(map[string]map[int][2]bool)
 	for idStr, floorMap := range outputRaw {
-		id,_:= strconv.Atoi(idStr)
-		results[id] = make(map[int][2]bool)
+		results[idStr] = make(map[int][2]bool)
 		for floorStr, btns:= range floorMap{
 			floor, _:= strconv.Atoi(floorStr)
-			results[id][floor] = btns
+			results[idStr][floor] = btns
 		}
 	}
 	return results, nil
@@ -81,7 +80,7 @@ func ProcessElevatorRequests(input HRAInput) (map[int]map[int][2]bool, error) {
 // extract cab requests from elevator
 func extractCabRequests(e common.Elevator) []bool {
 	cabRequests := make([]bool, common.N_FLOORS)
-	for f := 0; f < common.N_FLOORS; f++ {
+	for f := range common.N_FLOORS {
 		cabRequests[f] = e.Requests[f][elevio.BT_Cab]
 	}
 	return cabRequests

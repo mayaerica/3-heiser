@@ -13,23 +13,17 @@ import (
 )
 
 var mutex sync.Mutex
-var ElevatorStates map[int]common.Elevator
+var ElevatorStates map[string]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
 
 func InitDispatcher() {
-	ElevatorStates = make(map[int]common.Elevator)
+	ElevatorStates = make(map[string]common.Elevator)
 	go Synchronizer()
 }
 
 func UpdateLocalElevatorState(e common.Elevator) {
 	mutex.Lock()
-	id, err := strconv.Atoi(e.ID)
-	if err != nil {
-		fmt.Println("invalid elevator ID: ", e.ID)
-		mutex.Unlock()
-		return
-	}
-	ElevatorStates[id] = e
+	ElevatorStates[e.ID] = e
 	mutex.Unlock()
 }
 
@@ -57,7 +51,7 @@ func HallRequestsToBool() [common.N_FLOORS][2]bool {
 	return out
 }
 
-func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
+func AssignRequest(floor int, button elevio.ButtonType, elevatorID string) bool {
 	mutex.Lock()
 	if HallRequests[floor][button] == common.NotRequested || HallRequests[floor][button] == common.Unknown {
 		HallRequests[floor][button] = common.Unassigned
@@ -67,23 +61,20 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 	hraInput := hra.CreateHRAInput(ElevatorStates, HallRequestsToBool())
 	hraOutput, err := hra.ProcessElevatorRequests(hraInput)
 	if err != nil {
-		fmt.Println("HRA error: ", err)
 		return false
 	}
 
 	if floorAssignments, ok := hraOutput[elevatorID]; ok {
 		if floorAssignments[floor][button] {
-			fmt.Println("HRA assigned call to this elevator:", floor, button)
+			fmt.Printf("please work. assigned request: floor=%d, button=%d to elevator=%s\n", floor, button, elevatorID)
+
 			UpdateOrderState(floor, int(button), common.Assigned)
+
 			elevator := ElevatorStates[elevatorID]
 			elevator.Requests[floor][button] = true
 			ElevatorStates[elevatorID] = elevator
 			return true
-		} else {
-			fmt.Println("..")
 		}
-	} else {
-		fmt.Println("HRA did not find elevator ID in output:", elevatorID)
 	}
 	return false
 }
@@ -134,7 +125,7 @@ func ChooseDirection(e common.Elevator) common.DirnBehaviourPair {
 func StartDispatcherLoop(localElevID int, requestChan <-chan elevio.ButtonEvent, assignChan chan<- elevio.ButtonEvent) {
 	go func() {
 		for btn := range requestChan {
-			success := AssignRequest(btn.Floor, btn.Button, localElevID)
+			success := AssignRequest(btn.Floor, btn.Button, strconv.Itoa(localElevID))
 			if success {
 				assignChan <- btn
 			}

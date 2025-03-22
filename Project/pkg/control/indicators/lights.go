@@ -21,7 +21,7 @@ func UpdateCabLights(e common.Elevator){
 func UpdateHallLightsFromPerspective(perspective [common.N_FLOORS][2]common.OrderState){
 	for floor:=0; floor < common.N_FLOORS; floor++ {
 		for btnType:=0; btnType < 2; btnType++{
-			shouldBeLit := perspective[floor][btnType] != common.NotRequested
+			shouldBeLit := perspective[floor][btnType] == common.Unassigned || perspective[floor][btnType] == common.Assigned
 			elevio.SetButtonLamp(elevio.ButtonType(btnType), floor, shouldBeLit)
 		}
 	}
