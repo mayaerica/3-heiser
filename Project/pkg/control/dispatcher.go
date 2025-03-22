@@ -14,13 +14,13 @@ import (
 var mutex sync.Mutex
 var ElevatorStates map[int]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
-var AssignedTo [common.N_FLOORS][2]int
+var HandledBy [common.N_FLOORS][2]int
 
 func InitDispatcher() {
 	ElevatorStates = make(map[int]common.Elevator)
 	for f:= 0; f<common.N_FLOORS, f++{
 		for b:=0;b<2;b++{
-			AssignedTo[f][b] = -1
+			HandledBy[f][b] = -1
 		}
 	}
 	go Synchronizer()
@@ -75,7 +75,7 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID int) bool {
 		for f, btns := range floorAssignments {
 			for b, assigned := range btns {
 				if assigned {
-					AssignedTo[f][b] = id
+					HandledBy[f][b] = id
 					if id == elevatorID && f == floor && b == int(button) {
 						HallRequests[f][b] = common.Existing
 						ElevatorStates[elevatorID].Requests[f][b] = true
@@ -131,9 +131,9 @@ func Synchronizer() {
 			}
 			for f:= 0; f<common.N_FLOORS;f++{
 				for b:= 0; b< 2; b++{
-					if lost[AssignedTo[f][b]] && HallRequests[f][b] ==common.Existing{
+					if lost[HandledBy[f][b]] && HallRequests[f][b] ==common.Existing{
 						HallRequests[f][b] = common.HalfExisting
-						AssignedTo[f][b] = -1
+						HandledBy[f][b] = -1
 					}
 				}
 			}
