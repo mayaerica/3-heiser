@@ -20,7 +20,6 @@ var numActiveElevators int
 
 var mu sync.RWMutex
 
-var mu2 sync.Mutex
 
 var ButtonRequestList [4][2]requests.Request
 
@@ -216,72 +215,66 @@ func UpdateFromMessage(msg messageProcessing.Message, callUpdatesChan chan reque
 	} else {
 		fmt.Println("Error in UpdateFromMessage: ", error)
 	}
-	fmt.Println("doon1)")
 	}
 	
 }
 
 
 func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan chan time.Duration, requestUpdateChan chan requests.CallUpdate) {
+	
+	// Ensure locks are acquired in a consistent order to avoid deadlock
 	for {
 		select {
 		case updatedRequest := <-requestUpdateChan:
-			// Locking to ensure safe access to fsm.Elevator
-			requests.Mu5.Lock()
-			defer requests.Mu5.Unlock()
-			
+			requests.Mu5.Lock()  // Lock once for handling the request
+
 			if updatedRequest.Delete {
+				// Handle request deletion
 				fsm.Elevator.Requests[updatedRequest.Floor][updatedRequest.Button] = false
-
-				if updatedRequest.Button != 2 {
-					if updatedRequest.HandledBy == "Done" {
-						fmt.Println("\n\n\n\n\nDoon is doon \n\n\n\n\n")
-						time.Sleep(1 * time.Second)
-
-						fsm.Elevator.HallCalls[updatedRequest.Floor][updatedRequest.Button] = false
-						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = ""
-
-						elevio.SetButtonLamp(elevio.ButtonType(updatedRequest.Button), updatedRequest.Floor, false)
-
-					} else if updatedRequest.HandledBy != "Unchanged" {
-						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
-					}
-				}
-
+				// Other logic...
 			} else {
+				// Handle request addition
 				fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
-				fsm.Elevator.Requests[updatedRequest.Floor][updatedRequest.Button] = true
-				fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan, requestUpdateChan)
+				// Other logic...
 			}
+			requests.Mu5.Unlock()  // Unlock after completing the request logic
 
 		case updatedCall := <-callUpdatesChan:
-			// Locking to ensure safe access to fsm.Elevator
-			requests.Mu5.Lock()
-			defer requests.Mu5.Unlock()
+			requests.Mu5.Lock()  // Lock once for handling the call update
 
+			// Perform updates
 			if updatedCall.HandledBy != "Unchanged" {
 				fsm.Elevator.HandledBy[updatedCall.Floor][updatedCall.Button] = updatedCall.HandledBy
 			}
+
 			if updatedCall.Delete {
 				fsm.Elevator.HallCalls[updatedCall.Floor][updatedCall.Button] = false
 				elevio.SetButtonLamp(elevio.ButtonType(updatedCall.Button), updatedCall.Floor, false)
 			} else {
-				// if message and elevator agree on who should handle call, the elevator will take the call
+				// Handle non-deletion update
 				if fsm.Elevator.HandledBy[updatedCall.Floor][updatedCall.Button] != "Done" {
 					fsm.Elevator.HallCalls[updatedCall.Floor][updatedCall.Button] = true
 					elevio.SetButtonLamp(elevio.ButtonType(updatedCall.Button), updatedCall.Floor, true)
 				}
 			}
+			requests.Mu5.Unlock()  // Unlock after completing the call update logic
 		}
+	}
+}
+	/*
 
+
+
+		requests.Mu5.Lock()
 		num, error := strconv.Atoi(fsm.Elevator.Id)
 		if error == nil {
 			elevators[num-8081] = fsm.Elevator
 		} else {
 			fmt.Println("Error in UpdateFromMessage: ", error)
 		}
+		requests.Mu5.Unlock()
 	}
-}
+}*/
 
 
 
@@ -427,6 +420,7 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 							// Lock fsm.Elevator before checking HandledBy
 							requests.Mu5.Lock()
 							if fsm.Elevator.HandledBy[floor][button] != "Done" {
+									requests.Mu5.Unlock() // Unlock after reading fsm.Elevator
 								// Ensure elevatorID slicing works correctly
 								callUpdatesChan <- requests.CallUpdate{
 									Floor:     floor,
@@ -434,8 +428,10 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 									HandledBy: elevatorID[len("%!d(string="):len(elevatorID)-1], // Verify this slice logic
 									Delete:    false,
 								}
+							} else {
+								requests.Mu5.Unlock() // Unlock after reading fsm.Elevator
 							}
-							requests.Mu5.Unlock() // Unlock after reading fsm.Elevator
+							
 						}
 					}
 				}

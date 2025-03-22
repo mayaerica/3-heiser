@@ -60,37 +60,50 @@ func PrintLastReceivedMessages(message Message) {
         }
 
 }
-
-
-func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message){
-    for{
+func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message) {
+    for {
         select {
-            case p :=<-peerUpdateCh:
-            Mu2.Lock()
-            for elevator := range p.Lost {
-                
-                ElevatorStatus[p.Lost[elevator]]=false
-                
-            }
+        case p := <-peerUpdateCh:
+            // Lock ActiveMu to safely modify ElevatorStatus
             ActiveMu.Lock()
-            if len (p.New)!=0{
-                ElevatorStatus[p.New]=true
+
+            // Process lost elevators
+            for elevator := range p.Lost {
+                ElevatorStatus[p.Lost[elevator]] = false
             }
+
+            // Process new elevators
+            if len(p.New) != 0 {
+                ElevatorStatus[p.New] = true
+            }
+
+            // Unlock after updating ElevatorStatus
             ActiveMu.Unlock()
 
-            Mu2.Unlock()
+        default:
+            
 
-            default:
-                requests.Mu5.Lock()
-                msg := Message{
-                    Elevator:      fsm.Elevator,              // Use the colon to assign a value to the Elevator field
-                    Active1:       ElevatorStatus["8081"], 
-                    Active2:       ElevatorStatus["8082"],
-                    Active3:       ElevatorStatus["8083"],
-                }
-                requests.Mu5.Unlock()
-                messageTx <- msg
-                time.Sleep(10 * time.Millisecond)
+            requests.Mu5.Lock()
+            // Create the message
+            msg := Message{
+                Elevator: fsm.Elevator,
+                Active1: ElevatorStatus["8081"],
+                Active2: ElevatorStatus["8082"],
+                Active3: ElevatorStatus["8083"],
             }
+
+            // Unlock after constructing the message
+            requests.Mu5.Unlock()
+            // Attempt to send the message without blocking
+            select {
+            case messageTx <- msg:
+                // Message was sent successfully
+            default:
+
+            }
+
+            // Sleep to prevent high CPU usage
+            time.Sleep(10 * time.Millisecond)
         }
+    }
 }

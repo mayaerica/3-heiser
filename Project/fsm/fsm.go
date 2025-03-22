@@ -27,7 +27,9 @@ func setAllLights(e elevator.Elevator) {
 } 
 
 
-func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
+func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
+	requests.Mu5.Lock()
+
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
 		if requests.ShouldClearImmediatley(Elevator, btn_floor, btn_type) { 
@@ -37,9 +39,11 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 			// Set the request
 			Elevator.Requests[btn_floor][btn_type] = true 
 		}
+		requests.Mu5.Unlock()
 
 	case elevator.MOVING:
 		Elevator.Requests[btn_floor][btn_type] = true 
+		requests.Mu5.Unlock()
 
 	case elevator.IDLE:
 		Elevator.Requests[btn_floor][btn_type] = true   
@@ -53,7 +57,7 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 		case elevator.DOOR_OPEN:
 			elevio.SetDoorOpenLamp(true)
 			timer_start <- Elevator.DoorOpenDuration   
-			requests.ClearAtCurrentFloor(Elevator, requestUpdatesChan)
+			Elevator = requests.ClearAtCurrentFloor(Elevator)
 		case elevator.MOVING:
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(Elevator.Dirn)
@@ -61,6 +65,7 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 		case elevator.IDLE:
 			elevio.SetDoorOpenLamp(false)
 		}
+		requests.Mu5.Unlock()
 		
 	}
 	setAllLights(Elevator)
@@ -78,7 +83,7 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration, requestUpdates
 		if requests.RequestShouldStop(Elevator) {
 			elevio.SetMotorDirection(elevio.MD_Stop) 
 			elevio.SetDoorOpenLamp(true)
-			requests.ClearAtCurrentFloor(Elevator,requestUpdatesChan)
+			Elevator = requests.ClearAtCurrentFloor(Elevator)
 			timer_start <- Elevator.DoorOpenDuration 
 			setAllLights(Elevator)
 			Elevator.Behaviour = elevator.DOOR_OPEN
@@ -108,7 +113,7 @@ func OnDoorTimeout(timer_start chan time.Duration, requestUpdatesChan chan reque
 		switch Elevator.Behaviour {
 		case elevator.DOOR_OPEN:
 			timer_start <- Elevator.DoorOpenDuration
-			requests.ClearAtCurrentFloor(Elevator, requestUpdatesChan)
+			Elevator = requests.ClearAtCurrentFloor(Elevator)
 			setAllLights(Elevator)
 
 		case elevator.MOVING:

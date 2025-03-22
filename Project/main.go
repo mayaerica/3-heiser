@@ -144,10 +144,18 @@ func main() {
 	//event loop
 	fmt.Println("start")
 	for {
-		fmt.Println(lastTask)
+		//fmt.Println(lastTask)
 		resource.PrintElevators()
 		//fmt.Println("still alive")
 		select {
+		case msg := <-messageRx:
+			lastTask += "M"
+			// fmt.Println("7")
+			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
+			//fmt.Println("\n\n\n\n\n 7 \n\n\n\n\n")
+			resource.UpdateFromMessage(msg, callUpdatesChan)
+
+
 		case btn := <-BtnEventChan:
 			lastTask ="ButtonEvent"
 			
@@ -165,7 +173,7 @@ func main() {
 				} else {
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
-					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan, requestUpdatesChan)
+					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
 				}
 				
 		case floor := <-FloorChan:
@@ -206,13 +214,7 @@ func main() {
 			lastTask = "Update"
 	
 
-		case msg := <-messageRx:
-			lastTask += "M"
-			// fmt.Println("7")
-			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
-			//fmt.Println("\n\n\n\n\n 7 \n\n\n\n\n")
-			resource.UpdateFromMessage(msg, callUpdatesChan)
-
+		
 		
 		}
 	}
