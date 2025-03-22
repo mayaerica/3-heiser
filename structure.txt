@@ -1,7 +1,7 @@
-/cmd                    
-│   ├── main.go           
-│   ├── config.go            # dont know if its completely necessary 
-│
+                  
+├── main.go
+├── packet_loss 
+│   ├── packet_loss.d        #don't completely understand yet..          
 /elevio                      # Handles hardware communication
 │   ├── elevio.go
 │
@@ -29,6 +29,7 @@
 │
 │   ├── /utils               # General helper functions i guess
 │   │   ├── conversions.go
+│   │   ├── timer.go
 │
 go.mod                    
 README.md                 
