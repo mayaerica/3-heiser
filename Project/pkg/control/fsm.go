@@ -166,7 +166,7 @@ func handleMovingState() {
 }
 
 func PrintElevatorState() {
-	fmt.Println("========= Elevator State =========")
+	fmt.Println("========== Elevator State ==========")
 	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
 		Elevator.ID, Elevator.Floor, Elevator.Dirn, Elevator.Behaviour)
 
@@ -179,5 +179,5 @@ func PrintElevatorState() {
 			Elevator.Requests[floor][elevio.BT_HallDown],
 		)
 	}
-	fmt.Println("==================================")
+	fmt.Println("====================================")
 }
