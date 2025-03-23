@@ -216,10 +216,8 @@ func main() {
 		case <-ticker.C:
 			
 			//fmt.Println("6")
-			requests.Mu5.Lock()
 			//fmt.Println("6, got lock")
 			resource.PrintElevators()
-			requests.Mu5.Unlock()
 			//fmt.Println("last task: ", lastTask)
 			lastTask = "Update"
 	
