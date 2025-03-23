@@ -144,7 +144,7 @@ func main() {
 	//event loop
 	fmt.Println("start")
 	for {
-		fmt.Print(lastTask)
+		//fmt.Print(lastTask)
 		//resource.PrintElevators()
 		//fmt.Println("still alive")
 		select {
@@ -154,7 +154,7 @@ func main() {
 
 
 		case btn := <-BtnEventChan:
-			fmt.Println("Button")
+			//fmt.Println("Button")
 			lastTask ="ButtonEvent"
 			
 			if btn.Button != elevio.BT_Cab {
@@ -182,8 +182,8 @@ func main() {
 		case floor := <-FloorChan:
 			lastTask = "FloorEvent"
 
-			fmt.Println("FloorEvent")
-			fmt.Println("2")
+			//fmt.Println("FloorEvent")
+			//fmt.Println("2")
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
 				fsm.OnFloorArrival(floor, TimerStartChan, requestUpdatesChan)
@@ -208,16 +208,16 @@ func main() {
 		
 		case <-maintimer.C:
 			lastTask = "DoorTimeout"
-			fmt.Println("\n 5\n")
+			//fmt.Println("\n 5\n")
 			fsm.OnDoorTimeout(TimerStartChan,requestUpdatesChan)
-			timer.Stop()
+			//timer.Stop()
 
 		
 		case <-ticker.C:
 			
-			fmt.Println("6")
+			//fmt.Println("6")
 			requests.Mu5.Lock()
-			fmt.Println("6, got lock")
+			//fmt.Println("6, got lock")
 			resource.PrintElevators()
 			requests.Mu5.Unlock()
 			//fmt.Println("last task: ", lastTask)

@@ -54,7 +54,6 @@ func requestsHere(e elevator.Elevator) bool {
 		if e.Requests[e.Floor][btn] {
 			return true
 		}
-		fmt.Print()
 	}
 	return false
 }

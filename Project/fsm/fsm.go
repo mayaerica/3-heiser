@@ -28,10 +28,6 @@ func setAllLights(e elevator.Elevator) {
 
 
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
-	
-	fmt.Print(4, " ")
-	
-	
 
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
