@@ -142,6 +142,7 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 }
 
 func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {  
+	fmt.Println("\n\n\n\n clearing \n\n\n\n\n")
 	//locksDone, Request and hallcall from D file
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
@@ -152,6 +153,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 		e.Requests[e.Floor][elevio.BT_Cab] = false
 		switch e.Dirn {
 		case elevio.MD_Up:
+			fmt.Println("upup")
 			if !requestsAbove(e) && !e.Requests[e.Floor][elevio.BT_HallUp] {
 				e.Requests[e.Floor][elevio.BT_HallDown] = false
 				e.HallCalls[e.Floor][elevio.BT_HallDown] = false
@@ -159,7 +161,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			}
 			e.Requests[e.Floor][elevio.BT_HallUp] = false
 			e.HallCalls[e.Floor][elevio.BT_HallUp] = false
-			//e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
+			e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
 
 		case elevio.MD_Down:
 			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.BT_HallDown] {
@@ -169,7 +171,7 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 			}
 			e.Requests[e.Floor][elevio.BT_HallDown] = false
 			e.HallCalls[e.Floor][elevio.BT_HallDown] = false
-			//e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
+			e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done"
 			fmt.Print()
 		case elevio.MD_Stop:
 			fallthrough

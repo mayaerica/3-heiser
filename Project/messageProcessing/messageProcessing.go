@@ -81,8 +81,6 @@ func UpdateMessage(peerUpdateCh chan peers.PeerUpdate, messageTx chan Message) {
             ActiveMu.Unlock()
 
         default:
-            
-
             requests.Mu5.Lock()
             // Create the message
             msg := Message{

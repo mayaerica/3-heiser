@@ -24,7 +24,7 @@ var lastTask string
 Hanled by, requests, done and hallcalls are handled twice. Once by resourcemanager and once by UpdateElevatorHallCallsAndButtonLamp. 
 This should be fixed so that only one of them needs to set a value false when needed.
 */
-var UpdateInterval = 100 * time.Millisecond
+var UpdateInterval = 500 * time.Millisecond
 
 const (
 	numElevators = 3
@@ -98,7 +98,7 @@ func main() {
 	elevio.SetMotorDirection(elevio.MD_Stop)
 
 	fsm.Elevator.ClearRequestVariant = 1
-	fsm.Elevator.DoorOpenDuration = 1000*time.Millisecond
+	fsm.Elevator.DoorOpenDuration = 500*time.Millisecond
 	fsm.Elevator.Behaviour = elevator.IDLE
 	fsm.Elevator.Dirn = elevio.MD_Stop
 	fsm.Elevator.Id = elevatorID //this is converted back and forth, what spaghetti code hehe
@@ -144,23 +144,23 @@ func main() {
 	//event loop
 	fmt.Println("start")
 	for {
-		//fmt.Println(lastTask)
-		resource.PrintElevators()
+		fmt.Print(lastTask)
+		//resource.PrintElevators()
 		//fmt.Println("still alive")
 		select {
 		case msg := <-messageRx:
 			lastTask += "M"
-			// fmt.Println("7")
-			//UpdateElevatorHallCallsAndButtonLamp is the only thing updating requests so if no messages are recieved the system doesnt work
-			//fmt.Println("\n\n\n\n\n 7 \n\n\n\n\n")
 			resource.UpdateFromMessage(msg, callUpdatesChan)
 
 
 		case btn := <-BtnEventChan:
+			fmt.Println("Button")
 			lastTask ="ButtonEvent"
 			
 			if btn.Button != elevio.BT_Cab {
+				
 				if !fsm.Elevator.HallCalls[btn.Floor][btn.Button] {
+					
 					callUpdatesChan <- requests.CallUpdate{
 						Floor: btn.Floor,
 						Button: int(btn.Button),
@@ -169,16 +169,21 @@ func main() {
 					}
 					fsm.Elevator.HallCalls[btn.Floor][btn.Button] = true
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
+					lastTask += " ye "
 					}
 				} else {
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
+					requests.Mu5.Lock()
 					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
+					requests.Mu5.Unlock()
 				}
 				
 		case floor := <-FloorChan:
 			lastTask = "FloorEvent"
-			// fmt.Println("2")
+
+			fmt.Println("FloorEvent")
+			fmt.Println("2")
 			elevio.SetFloorIndicator(floor)
 			if floor != -1 {
 				fsm.OnFloorArrival(floor, TimerStartChan, requestUpdatesChan)
@@ -203,13 +208,18 @@ func main() {
 		
 		case <-maintimer.C:
 			lastTask = "DoorTimeout"
+			fmt.Println("\n 5\n")
 			fsm.OnDoorTimeout(TimerStartChan,requestUpdatesChan)
+			timer.Stop()
 
 		
 		case <-ticker.C:
 			
-			// fmt.Println("6")
-			//resource.PrintElevators()
+			fmt.Println("6")
+			requests.Mu5.Lock()
+			fmt.Println("6, got lock")
+			resource.PrintElevators()
+			requests.Mu5.Unlock()
 			//fmt.Println("last task: ", lastTask)
 			lastTask = "Update"
 	

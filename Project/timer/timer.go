@@ -18,12 +18,12 @@ func Start(timer *time.Timer, timer_start chan time.Duration) {
 		select{
 		case duration:=<-timer_start:
 
-			fmt.Print()
+			fmt.Print("\n\n\n\n\n Timer reset \n\n\n\n\n")
 			//fmt.Println("duration: ", duration)	
 			timer.Reset(duration)
 
 			//timerEndTime = time.Now().Add(time.Duration(duration * (time.Second)))
-			//TimerActive = true
+			TimerActive = true
 }
 		}	
 	}

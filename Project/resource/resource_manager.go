@@ -226,10 +226,12 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 	for {
 		select {
 		case updatedRequest := <-requestUpdateChan:
+			fmt.Print(1, " ")
 			requests.Mu5.Lock()  // Lock once for handling the request
+			fmt.Print(11, " ")
 			if updatedRequest.Delete {
 				fsm.Elevator.Requests[updatedRequest.Floor][updatedRequest.Button] = false
-
+				
 				if updatedRequest.Button != 2 {
 					if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == "Done" {
 						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = ""
@@ -240,16 +242,27 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
 					}
 				}
+				requests.Mu5.Unlock() //unlocks for this if statement
 
 			} else {
-				if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy { 
-					fmt.Println("\n\n\n\n\nYEYEYEYE\n\n\n\n\n\n")
+				if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy {
+					
+					fmt.Println("\n\n\n\n\n\n setting that shit \n\n\n\n\n\n")
 					fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan)
+					
+					PrintElevators()
+					fmt.Println("Thisone")
+					requests.Mu5.Unlock() 
+				} else {
+					requests.Mu5.Unlock() //Unlocks if elevator does not want request yet
 				}
 			}
-			requests.Mu5.Unlock()  // Unlock after completing the request logic
+			
+			
 
 		case updatedCall := <-callUpdatesChan:
+			
+			fmt.Print(2, " ")
 			requests.Mu5.Lock()  // Lock once for handling the call update
 
 			// Perform updates
@@ -263,6 +276,8 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 			} else {
 				// Handle non-deletion update
 				if fsm.Elevator.HandledBy[updatedCall.Floor][updatedCall.Button] != "Done" {
+					fmt.Println("\n\n\n\n DOOON \n\n\n\n")
+					PrintElevators()
 					fsm.Elevator.HallCalls[updatedCall.Floor][updatedCall.Button] = true
 					elevio.SetButtonLamp(elevio.ButtonType(updatedCall.Button), updatedCall.Floor, true)
 				}
@@ -431,7 +446,10 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 					for button, buttonState := range buttons {
 						if buttonState {
 							// Lock fsm.Elevator before checking HandledBy
+							
+							fmt.Print(3, " ")
 							requests.Mu5.Lock()
+							fmt.Print(33, " ")
 							if fsm.Elevator.HandledBy[floor][button] != "Done" {
 									requests.Mu5.Unlock() // Unlock after reading fsm.Elevator
 								// Ensure elevatorID slicing works correctly

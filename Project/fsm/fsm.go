@@ -28,25 +28,29 @@ func setAllLights(e elevator.Elevator) {
 
 
 func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start chan time.Duration) {
-	requests.Mu5.Lock()
-	fmt.Println("huh\n\n\n\n\n\n\n\n\n\n\n\n\n\n") //deadlock her venter for alltid 
+	
+	fmt.Print(4, " ")
+	
+	
 
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
 		if requests.ShouldClearImmediatley(Elevator, btn_floor, btn_type) { 
+			fmt.Println("\n\n\n\n\n\n sat trueee \n\n\n\n\n\n\n")
+			Elevator = requests.ClearAtCurrentFloor(Elevator)
+			//time.Sleep(1*time.Second)
 			// Start the door timer
-			timer_start <- Elevator.DoorOpenDuration 
+			timer_start <- Elevator.DoorOpenDuration
 		} else {
 			// Set the request
 			Elevator.Requests[btn_floor][btn_type] = true 
 		}
-		requests.Mu5.Unlock()
 
 	case elevator.MOVING:
 		Elevator.Requests[btn_floor][btn_type] = true 
-		requests.Mu5.Unlock()
 
 	case elevator.IDLE:
+		
 		Elevator.Requests[btn_floor][btn_type] = true   
 		//puts directions into the DirnBehaviourPair struct "pair"  
 		                   
@@ -66,7 +70,6 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 		case elevator.IDLE:
 			elevio.SetDoorOpenLamp(false)
 		}
-		requests.Mu5.Unlock()
 		
 	}
 	setAllLights(Elevator)
@@ -74,6 +77,9 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 
 
 func OnFloorArrival(newFloor int, timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
+	
+	
+	fmt.Print(6, " ")
 	requests.Mu5.Lock()
 	defer requests.Mu5.Unlock()
 	Elevator.Floor = newFloor
@@ -106,6 +112,8 @@ func OnDoorTimeout(timer_start chan time.Duration, requestUpdatesChan chan reque
 
 		var pair requests.DirnBehaviourPair
 		pair = requests.ChooseDirection(Elevator)
+		
+		fmt.Print(5, " ")
 		requests.Mu5.Lock()
 		defer requests.Mu5.Unlock()
 		Elevator.Dirn = pair.Dirn
