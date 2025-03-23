@@ -74,7 +74,7 @@ func executionLoop() {
 	for {
 		select {
 		case buttonPress := <-buttonPressChan:
-			fmt.Printf("[BUTTONPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
+			fmt.Printf("[BTNPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
 			handleButtonPress(buttonPress)
 
 		case assignedBtn := <-AssignedHallCallChan:

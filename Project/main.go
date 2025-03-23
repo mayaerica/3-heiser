@@ -12,8 +12,8 @@ func main() {
 	var myID string
 
 	// Usage:
-	//   go run main.go 0        → manually set elevator ID to "0"
-	//   go run main.go --auto   → auto-set ID based on local IP
+	//   go run main.go 0        → [manually] set elevator ID to "0"
+	//   go run main.go --auto   → [auto-set] ID based on local IP
 
 	if len(os.Args) < 2 {
 		fmt.Println("usage: go run main.go [elevatorID] OR --auto ")
