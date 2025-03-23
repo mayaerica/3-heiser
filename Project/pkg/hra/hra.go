@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"strconv"
 )
 
 type HRAElevState struct {
@@ -18,13 +17,12 @@ type HRAElevState struct {
 	CabRequests []bool `json:"cabRequests"`
 }
 
-// input format for HRA
 type HRAInput struct {
 	HallRequests [common.N_FLOORS][2]bool `json:"hallRequests"`
 	States       map[string]HRAElevState  `json:"states"`
 }
 
-// create HRA input from elevator states and hall requests
+
 func CreateHRAInput(states map[string]common.Elevator, hall [common.N_FLOORS][2]bool) HRAInput {
 	out := HRAInput{
 		HallRequests: hall,
@@ -42,46 +40,50 @@ func CreateHRAInput(states map[string]common.Elevator, hall [common.N_FLOORS][2]
 	return out
 }
 
-func ProcessElevatorRequests(input HRAInput) (map[string]map[int][2]bool, error) {
-	inputJSON, err := json.Marshal(input)
+func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
+
+	hraExecutable := ""
+	switch runtime.GOOS {
+	case "linux" :  hraExecutable = "hall_request_assigner"
+	case "windows": hraExecutable = "hall_request_assigner.exe"
+	default:        panic("Unsupported OS")
+	}
+
+	jsonBytes, err := json.Marshal(currentInput)
 	if err != nil {
-		return nil, err
+		fmt.Println("json.Marshal error:", err)
+		return nil
 	}
 
-	exe := "Project/pkg/hra"
-	if runtime.GOOS == "windows"{
-		exe += ".exe"
-	}
-
-	cmd:= exec.Command(exe, "-i", string(inputJSON))
-	output, err := cmd.CombinedOutput()
+	fmt.Println("[HRA] Running binary:", hraExecutable)
+	ret, err := exec.Command(hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("hra execution failed: %v\n%s", err, string(output))
-	}
-	
-	var outputRaw map[string]map[string][2]bool
-	err = json.Unmarshal(output, &outputRaw)
-	if err != nil{
-		return nil, fmt.Errorf("hra output fail: %v", err)
+		fmt.Println("exec.Command error:", err)
+		fmt.Println(string(ret))
+		return nil
 	}
 
-	//convert keys to int
-	results:= make(map[string]map[int][2]bool)
-	for idStr, floorMap := range outputRaw {
-		results[idStr] = make(map[int][2]bool)
-		for floorStr, btns:= range floorMap{
-			floor, _:= strconv.Atoi(floorStr)
-			results[idStr][floor] = btns
-		}
+	output := new(map[string][][2]bool)
+	err = json.Unmarshal(ret, &output)
+	if err != nil {
+		fmt.Println("json.Unmarshal error:", err)
+		return nil
 	}
-	return results, nil
+
+	fmt.Printf("HRAoutput:\n")
+	for k, v := range *output {
+		fmt.Printf("  %6v  %+v\n", k, v)
+	}
+
+	return output
 }
 
-// extract cab requests from elevator
+
 func extractCabRequests(e common.Elevator) []bool {
 	cabRequests := make([]bool, common.N_FLOORS)
 	for f := range common.N_FLOORS {
 		cabRequests[f] = e.Requests[f][elevio.BT_Cab]
 	}
+
 	return cabRequests
 }

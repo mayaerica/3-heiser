@@ -59,13 +59,13 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID string) bool 
 	mutex.Unlock()
 
 	hraInput := hra.CreateHRAInput(ElevatorStates, HallRequestsToBool())
-	hraOutput, err := hra.ProcessElevatorRequests(hraInput)
-	if err != nil {
-		fmt.Println("[HRA] Error during assignment:", err)
+	hraOutput := hra.HRAProcessor(hraInput)
+	if hraOutput  == nil {
+		fmt.Println("[HRA] Error during assignment")
 		return false
 	}
 
-	if floorAssignments, ok := hraOutput[elevatorID]; ok {
+	if floorAssignments, ok := (*hraOutput)[elevatorID]; ok {
 		if floorAssignments[floor][button] {
 			fmt.Printf("[HRA] Assigned request: floor=%d, button=%d to elevator=%s\n", floor, button, elevatorID)
 
