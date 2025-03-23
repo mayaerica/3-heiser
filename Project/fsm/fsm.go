@@ -36,7 +36,6 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 	switch Elevator.Behaviour {
 	case elevator.DOOR_OPEN:
 		if requests.ShouldClearImmediatley(Elevator, btn_floor, btn_type) { 
-			fmt.Println("\n\n\n\n\n\n sat trueee \n\n\n\n\n\n\n")
 			Elevator = requests.ClearAtCurrentFloor(Elevator)
 			//time.Sleep(1*time.Second)
 			// Start the door timer

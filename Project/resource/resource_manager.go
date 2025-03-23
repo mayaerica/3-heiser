@@ -247,11 +247,8 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 			} else {
 				if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy {
 					
-					fmt.Println("\n\n\n\n\n\n setting that shit \n\n\n\n\n\n")
 					fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan)
-					
-					PrintElevators()
-					fmt.Println("Thisone")
+				
 					requests.Mu5.Unlock() 
 				} else {
 					requests.Mu5.Unlock() //Unlocks if elevator does not want request yet
@@ -276,7 +273,6 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 			} else {
 				// Handle non-deletion update
 				if fsm.Elevator.HandledBy[updatedCall.Floor][updatedCall.Button] != "Done" {
-					fmt.Println("\n\n\n\n DOOON \n\n\n\n")
 					PrintElevators()
 					fsm.Elevator.HallCalls[updatedCall.Floor][updatedCall.Button] = true
 					elevio.SetButtonLamp(elevio.ButtonType(updatedCall.Button), updatedCall.Floor, true)
@@ -311,18 +307,38 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 		mu.RLock()
 		for floor := 0; floor < 4; floor++ { 
 			for button := 0; button < 2; button++ {
+				agreedDone := 0
+				for _,elevator := range elevators {
+					if fsm.Elevator.HandledBy[floor][button] == "Done" && !elevator.Requests[floor][button] && !elevator.HallCalls[floor][button] {
+						agreedDone++
+
+					}
+				}
+				
+				if agreedDone >= numActiveElevators {
+					requestUpdateChan <- requests.CallUpdate{
+						Floor: floor,
+						Button: button,
+						HandledBy: "Done",
+						Delete: true,
+					}
+				}
+
 				if fsm.Elevator.HandledBy[floor][button] == fsm.Elevator.Id { //Checks if local elevator wants call
-					
-					numActiveElevators = 0
+
 					
 					if numActiveElevators > 1 {
 						agreedOnFloor := 1
+						
 						for _,elevator := range elevators {
 							
+							//checks if elevators agree that elevator should take the call
 							if elevator.Id != fsm.Elevator.Id && elevator.HandledBy[floor][button] == fsm.Elevator.HandledBy[floor][button] && fsm.Elevator.HandledBy[floor][button] == fsm.Elevator.Id {
 								agreedOnFloor++
 							}
 						}
+
+
 						if agreedOnFloor >= 2 && !fsm.Elevator.Requests[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done" {
 							requestUpdateChan <- requests.CallUpdate{
 								Floor: floor,

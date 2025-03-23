@@ -24,7 +24,7 @@ var lastTask string
 Hanled by, requests, done and hallcalls are handled twice. Once by resourcemanager and once by UpdateElevatorHallCallsAndButtonLamp. 
 This should be fixed so that only one of them needs to set a value false when needed.
 */
-var UpdateInterval = 500 * time.Millisecond
+var UpdateInterval = 100 * time.Millisecond
 
 const (
 	numElevators = 3
@@ -149,7 +149,7 @@ func main() {
 		//fmt.Println("still alive")
 		select {
 		case msg := <-messageRx:
-			lastTask += "M"
+			//lastTask += "M"
 			resource.UpdateFromMessage(msg, callUpdatesChan)
 
 
