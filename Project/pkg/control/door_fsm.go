@@ -1,4 +1,4 @@
-package indicators
+package control
 
 import (
 	"elevatorlab/elevio"

@@ -22,11 +22,10 @@ type Elevator struct {
 	Dirn                elevio.Dirn
 	Behaviour           ElevatorBehaviour
 	Requests            [N_FLOORS][N_BUTTONS]bool
-	ClearRequestVariant ClearRequestVariant //could this just be "int"?
-	DoorOpenDuration    time.Duration       //could this just be "int"?
+	ClearRequestVariant ClearRequestVariant
+	DoorOpenDuration    time.Duration
 }
 
-// this will be used for HRA communication as well!
 type DirnBehaviourPair struct {
 	Dirn      elevio.Dirn
 	Behaviour ElevatorBehaviour
@@ -35,19 +34,25 @@ type DirnBehaviourPair struct {
 type OrderState int
 
 const (
-	Unknown OrderState = iota
-	NotRequested //no button press
-	Unassigned   //button press known, but needs to be assigned
-	Assigned     //while this request has been assigned
+	Unknown      OrderState = iota
+	NotRequested            //no button press
+	Unassigned              //button press known, but needs to be assigned
+	Assigned                //while this request has been assigned
 )
 
 type Perspective struct {
-	ID string
+	ID          string
 	Perspective [N_FLOORS][2]OrderState
 }
 
-// global state for tracking
 var GlobalPerspective Perspective
+
+type ClearRequestVariant int
+
+const (
+	CV_All    ClearRequestVariant = iota
+	CV_InDirn 
+)
 
 // Checks if the elevator should stop at the given floor based on requests.
 func (e *Elevator) ShouldStop(floor int) bool {
@@ -91,9 +96,4 @@ func (e *Elevator) HasRequestsBelow(floor int) bool {
 	return false
 }
 
-type ClearRequestVariant int
 
-const (
-	CV_All    = 0
-	CV_InDirn = 1
-)

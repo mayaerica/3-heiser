@@ -1,6 +1,6 @@
                   
 ├── main.go
-├── packet_loss 
+/packet_loss 
 │   ├── packet_loss.d        #don't completely understand yet..          
 /elevio                      # Handles hardware communication
 │   ├── elevio.go

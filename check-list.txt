@@ -35,7 +35,4 @@ sudo wget https://downloads.dlang.org/releases/2.x/2.105.2/dmd_2.105.2-0_amd64.d
 sudo dpkg -i dmd_2.105.2-0_amd64.deb
 sudo apt-get install -f
 
-in the end: had to modify the jsonx.d file... now it should work tho
-then,
-cd ElevatorProject/Project
-chmod +x pkg/hra/hall_request_assigner/hall_request_assigner
+

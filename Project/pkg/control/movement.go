@@ -63,19 +63,29 @@ func ClearRequestsAtCurrentFloor(e *common.Elevator) {
 	floor := e.Floor
 	dirn := e.Dirn
 
+	if e.Requests[floor][elevio.BT_HallUp] {
+		OrderCompleteChan <- elevio.ButtonEvent{Floor: floor, Button: elevio.BT_HallUp}
+	}
+	if e.Requests[floor][elevio.BT_HallDown] {
+		OrderCompleteChan <- elevio.ButtonEvent{Floor: floor, Button: elevio.BT_HallDown}
+	}
+
 	switch e.ClearRequestVariant {
 	case common.CV_All:
 		for btn := 0; btn < common.N_BUTTONS; btn++ {
 			e.Requests[floor][btn] = false
 		}
+
 	case common.CV_InDirn:
 		e.Requests[floor][elevio.BT_Cab] = false
 
 		switch dirn {
 		case elevio.MD_Up:
 			e.Requests[floor][elevio.BT_HallUp] = false
+
 		case elevio.MD_Down:
 			e.Requests[floor][elevio.BT_HallDown] = false
+
 		case elevio.MD_Stop:
 			e.Requests[floor][elevio.BT_HallUp] = false
 			e.Requests[floor][elevio.BT_HallDown] = false
@@ -85,15 +95,15 @@ func ClearRequestsAtCurrentFloor(e *common.Elevator) {
 	backup.SaveCabRequests(*e)
 }
 
-func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.ButtonType) bool{
+func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.ButtonType) bool {
 	if e.Floor != btnFloor {
 		return false
 	}
 
-	switch e.ClearRequestVariant{
+	switch e.ClearRequestVariant {
 	case common.CV_All:
 		return true
-	
+
 	case common.CV_InDirn:
 		return btnType == elevio.BT_Cab ||
 			e.Dirn == elevio.MD_Stop ||
@@ -102,4 +112,37 @@ func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.Butt
 	default:
 		return false
 	}
+}
+
+func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehaviourPair {
+	switch prevDirn {
+	case elevio.MD_Up:
+		if RequestsAbove(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.MOVING}
+		} else if RequestsHere(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.DOOR_OPEN}
+		} else if RequestsBelow(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
+		}
+
+	case elevio.MD_Down:
+		if RequestsBelow(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
+		} else if RequestsHere(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.DOOR_OPEN}
+		} else if RequestsAbove(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.MOVING}
+		}
+
+	case elevio.MD_Stop:
+		if RequestsHere(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.DOOR_OPEN}
+		} else if RequestsAbove(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.MOVING}
+		} else if RequestsBelow(e) {
+			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
+		}
+	}
+
+	return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 }
