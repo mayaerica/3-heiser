@@ -5,13 +5,9 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
 	"elevatorlab/pkg/control/indicators"
-	"sync"
 	"fmt"
 	"time"
 )
-
-var elevator_mutex sync.Mutex
-var Elevator common.Elevator
 
 // Channel for transitioning FSM states (IDLE, MOVING, DOOR_OPEN)
 var StateChan = make(chan common.ElevatorBehaviour)
@@ -34,7 +30,7 @@ var OrderCompleteChan = make(chan elevio.ButtonEvent)
 func InitFSM(elevatorID string) {
 	detectedFloor := elevio.GetFloor()
 
-	Elevator = common.Elevator{
+	e := common.Elevator{
 		ID:                  elevatorID,
 		Behaviour:           common.IDLE,
 		Dirn:                elevio.MD_Stop,
@@ -46,37 +42,32 @@ func InitFSM(elevatorID string) {
 	if detectedFloor == -1 {
 		fmt.Println("Starting inbetween floors -> moving down to find floor...")
 		elevio.SetMotorDirection(elevio.MD_Down)
-		Elevator.Behaviour = common.MOVING
-		Elevator.Dirn = elevio.MD_Down
+		e.Behaviour = common.MOVING
+		e.Dirn = elevio.MD_Down
 	} else {
 		fmt.Println("Starting at floor", detectedFloor)
 		elevio.SetFloorIndicator(detectedFloor)
-		Elevator.Behaviour = common.IDLE
-		Elevator.Dirn = elevio.MD_Stop
+		e.Behaviour = common.IDLE
+		e.Dirn = elevio.MD_Stop
 	}
 
-	backup.LoadCabRequests(&Elevator)
-	InitDispatcher(Elevator.ID, Elevator)
-	
+	SetLocalElevator(e)
+	backup.LoadCabRequests(&e)
+	SetLocalElevator(e)
+
 	go StateMachineLoop()
 	go executionLoop()
-	go DoorFSM(DoorOpenChan, DoorCloseChan, Elevator.DoorOpenDuration)
-
-	
+	go DoorFSM(DoorOpenChan, DoorCloseChan, e.DoorOpenDuration)
 }
 
 func StateMachineLoop() {
 	for {
 		select {
 		case state := <-StateChan:
-			fmt.Println(1,1)
-			elevator_mutex.Lock()
-			fmt.Println(1,1)
-			Elevator.Behaviour = state
-			fmt.Println("what")
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Behaviour = state
+			})
 			handleState()
-			elevator_mutex.Unlock()
-			fmt.Println(1,2)
 		}
 	}
 }
@@ -91,12 +82,7 @@ func executionLoop() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
-			fmt.Println(2,1)
-			elevator_mutex.Lock()
-			fmt.Println(2,1)
 			PrintElevatorState()
-			elevator_mutex.Unlock()
-			fmt.Println(2,2)
 		}
 	}()
 
@@ -106,53 +92,50 @@ func executionLoop() {
 		select {
 		case buttonPress := <-buttonPressChan:
 			fmt.Printf("[BTNPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
-			fmt.Println(3,1)
-			elevator_mutex.Lock()
 			handleButtonPress(buttonPress, &prevDirn)
-			elevator_mutex.Unlock()
-			fmt.Println(3,2)
 
 		case assignedBtn := <-AssignedHallCallChan:
-			fmt.Println(4,1)
-			elevator_mutex.Lock()
-			Elevator.Requests[assignedBtn.Floor][assignedBtn.Button] = true
-			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
-			if Elevator.Behaviour == common.IDLE {
-				next := ChooseDirection(Elevator, prevDirn)
-				Elevator.Dirn = next.Dirn
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Requests[assignedBtn.Floor][assignedBtn.Button] = true
+			})
+			indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
+
+			if GetLocalElevator().Behaviour == common.IDLE {
+				e := GetLocalElevator()
+				next := ChooseDirection(e, prevDirn)
+				UpdateLocalElevator(func(e *common.Elevator) {
+					e.Dirn = next.Dirn
+				})
 				StateChan <- next.Behaviour
 				if next.Dirn != elevio.MD_Stop {
 					prevDirn = next.Dirn
 				}
 			}
-			elevator_mutex.Unlock()
-			fmt.Println(4,2)
 
 		case floor := <-floorSensorChan:
-			fmt.Println(5,1)
-			elevator_mutex.Lock()
-			Elevator.Floor = floor
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Floor = floor
+			})
 			elevio.SetFloorIndicator(floor)
 
-			if RequestShouldStop(Elevator) {
+			if RequestShouldStop(GetLocalElevator()) {
 				StopElevator()
-				Elevator.Behaviour = common.DOOR_OPEN
-				Elevator.Dirn = elevio.MD_Stop
-				SendCompletedHallRequests(Elevator)
-				ClearRequestsAtCurrentFloor(&Elevator)
-				indicators.UpdateAllLights(Elevator, common.GetGlobalPerspective().Perspective)
+				UpdateLocalElevator(func(e *common.Elevator) {
+					e.Behaviour = common.DOOR_OPEN
+					e.Dirn = elevio.MD_Stop
+				})
+				SendCompletedHallRequests(GetLocalElevator())
+				ClearRequestsAtCurrentFloor()
+				indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
 				DoorOpenChan <- struct{}{}
 			}
-			elevator_mutex.Unlock()
-			fmt.Println(5,2)
 
 		case <-DoorCloseChan:
-			fmt.Println(6,1)
-			elevator_mutex.Lock()
-			next := ChooseDirection(Elevator, prevDirn)
-			Elevator.Dirn = next.Dirn
-			elevator_mutex.Unlock()
-			fmt.Println(6,2)
+			e := GetLocalElevator()
+			next := ChooseDirection(e, prevDirn)
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Dirn = next.Dirn
+			})
 			StateChan <- next.Behaviour
 			if next.Dirn != elevio.MD_Stop {
 				prevDirn = next.Dirn
@@ -164,29 +147,29 @@ func executionLoop() {
 func handleButtonPress(buttonPress elevio.ButtonEvent, prevDirn *elevio.Dirn) {
 	switch buttonPress.Button {
 	case elevio.BT_Cab:
-		fmt.Println(7,1)
-		elevator_mutex.Lock()
-		Elevator.Requests[buttonPress.Floor][elevio.BT_Cab] = true
-		backup.SaveCabRequests(Elevator)
-		indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+		UpdateLocalElevator(func(e *common.Elevator) {
+			e.Requests[buttonPress.Floor][elevio.BT_Cab] = true
+		})
+		backup.SaveCabRequests(GetLocalElevator())
+		indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
 
-		if Elevator.Behaviour == common.IDLE {
-			dirnPair := ChooseDirection(Elevator, *prevDirn)
-			Elevator.Dirn = dirnPair.Dirn
+		if GetLocalElevator().Behaviour == common.IDLE {
+			dirnPair := ChooseDirection(GetLocalElevator(), *prevDirn)
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Dirn = dirnPair.Dirn
+			})
 			StateChan <- dirnPair.Behaviour
 			if dirnPair.Dirn != elevio.MD_Stop {
 				*prevDirn = dirnPair.Dirn
 			}
 		}
-		elevator_mutex.Unlock()
-		fmt.Println(7,2)
 	case elevio.BT_HallUp, elevio.BT_HallDown:
 		HallCallRequestChan <- buttonPress
 	}
 }
 
 func handleState() {
-	switch Elevator.Behaviour {
+	switch GetLocalElevator().Behaviour {
 	case common.IDLE:
 		handleIdleState()
 	case common.MOVING:
@@ -197,8 +180,11 @@ func handleState() {
 }
 
 func handleIdleState() {
-	next := ChooseDirection(Elevator, Elevator.Dirn)
-	Elevator.Dirn = next.Dirn
+	e := GetLocalElevator()
+	next := ChooseDirection(e, e.Dirn)
+	UpdateLocalElevator(func(e *common.Elevator) {
+		e.Dirn = next.Dirn
+	})
 	StateChan <- next.Behaviour
 }
 
@@ -206,16 +192,18 @@ func handleMovingState() {
 	for {
 		newFloor := elevio.GetFloor()
 		if newFloor != -1 {
-			Elevator.Floor = newFloor
+			UpdateLocalElevator(func(e *common.Elevator) {
+				e.Floor = newFloor
+			})
 			elevio.SetFloorIndicator(newFloor)
 
-			if RequestShouldStop(Elevator) {
+			if RequestShouldStop(GetLocalElevator()) {
 				StopElevator()
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan
-				SendCompletedHallRequests(Elevator)
-				ClearRequestsAtCurrentFloor(&Elevator)
-				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+				SendCompletedHallRequests(GetLocalElevator())
+				ClearRequestsAtCurrentFloor()
+				indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
 				StateChan <- common.IDLE
 				return
 			}
@@ -235,17 +223,18 @@ func SendCompletedHallRequests(e common.Elevator) {
 }
 
 func PrintElevatorState() {
+	e := GetLocalElevator()
 	fmt.Println("========== Elevator State ==========")
 	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
-		Elevator.ID, Elevator.Floor, Elevator.Dirn, Elevator.Behaviour)
+		e.ID, e.Floor, e.Dirn, e.Behaviour)
 
 	fmt.Println("Requests: ")
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
 			floor,
-			Elevator.Requests[floor][elevio.BT_Cab],
-			Elevator.Requests[floor][elevio.BT_HallUp],
-			Elevator.Requests[floor][elevio.BT_HallDown],
+			e.Requests[floor][elevio.BT_Cab],
+			e.Requests[floor][elevio.BT_HallUp],
+			e.Requests[floor][elevio.BT_HallDown],
 		)
 	}
 	fmt.Println("====================================")
