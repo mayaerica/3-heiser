@@ -11,26 +11,26 @@ import (
 func BehaviourToString(b common.ElevatorBehaviour) string {
 	switch b{
 	case common.IDLE:
-		return "IDLE"
+		return "idle"
 	case common.MOVING:
-		return "MOVING"
+		return "moving"
 	case common.DOOR_OPEN:
-		return "DOOR_OPEN"
+		return "doorOpen"
 	default:
-		return "UNKNOWN"
+		return "unknown"
 	}
 }
 
 func DirectionToString(d elevio.Dirn) string {
 	switch d {
 	case elevio.MD_Stop:
-		return "STOP"
+		return "stop"
 	case elevio.MD_Up:
-		return "UP"
+		return "up"
 	case elevio.MD_Down:
-		return "DOWN"
+		return "down"
 	default:
-		return "UNKNOWN"
+		return "unknown"
 	}
 }
 

@@ -12,8 +12,9 @@ Run elevator simulator:
 ./SimElevatorServer --port 15659
 
 Common fixes:
-Error: missing module ->
+Error: missing module or just saying not true stuff ->
 go mod tidy
+or Reload window 
 
 Error: go.mod file not found ->
 check if in correct folder!
