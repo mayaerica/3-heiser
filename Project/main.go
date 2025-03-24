@@ -158,25 +158,29 @@ func main() {
 			lastTask ="ButtonEvent"
 			
 			if btn.Button != elevio.BT_Cab {
-				
+				requests.Mu5.Lock()
+
 				if !fsm.Elevator.HallCalls[btn.Floor][btn.Button] {
-					
+					requests.Mu5.Unlock()
 					callUpdatesChan <- requests.CallUpdate{
 						Floor: btn.Floor,
 						Button: int(btn.Button),
 						HandledBy: "",
 						Delete: false,
 					}
-					fsm.Elevator.HallCalls[btn.Floor][btn.Button] = true
 					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
 					lastTask += " ye "
 					}
 				} else {
-					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
-					fsm.Elevator.Requests[btn.Floor][btn.Button] = true
-					requests.Mu5.Lock()
-					fsm.OnRequestButtonPress(btn.Floor, btn.Button, TimerStartChan)
 					requests.Mu5.Unlock()
+					requestUpdatesChan <- requests.CallUpdate{
+						Floor: btn.Floor,
+						Button: int(btn.Button),
+						HandledBy: "",
+						Delete: false,
+					}
+					elevio.SetButtonLamp(btn.Button, btn.Floor, true)
+					
 				}
 				
 		case floor := <-FloorChan:
@@ -217,7 +221,7 @@ func main() {
 			
 			//fmt.Println("6")
 			//fmt.Println("6, got lock")
-			resource.PrintElevators()
+			//resource.PrintElevators()
 			//fmt.Println("last task: ", lastTask)
 			lastTask = "Update"
 	

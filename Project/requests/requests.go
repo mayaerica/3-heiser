@@ -141,7 +141,6 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 }
 
 func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {  
-	//locksDone, Request and hallcall from D file
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
 		for btn := 0; btn < elevator.N_BUTTONS; btn++ {

@@ -74,8 +74,9 @@ func OnRequestButtonPress(btn_floor int, btn_type elevio.ButtonType, timer_start
 func OnFloorArrival(newFloor int, timer_start chan time.Duration, requestUpdatesChan chan requests.CallUpdate) {
 	
 	
-	fmt.Print(6, " ")
+	//fmt.Println(6, 1)
 	requests.Mu5.Lock()
+	//fmt.Println(6, 1)
 	defer requests.Mu5.Unlock()
 	Elevator.Floor = newFloor
 	elevio.SetFloorIndicator(Elevator.Floor)
@@ -89,6 +90,7 @@ func OnFloorArrival(newFloor int, timer_start chan time.Duration, requestUpdates
 			timer_start <- Elevator.DoorOpenDuration 
 			setAllLights(Elevator)
 			Elevator.Behaviour = elevator.DOOR_OPEN
+			//fmt.Println(6, 2)
 		}
 	default:
 		break
@@ -106,10 +108,10 @@ func OnDoorTimeout(timer_start chan time.Duration, requestUpdatesChan chan reque
 		elevio.SetDoorOpenLamp(false)
 
 		var pair requests.DirnBehaviourPair
-		pair = requests.ChooseDirection(Elevator)
-		
-		fmt.Print(5, " ")
 		requests.Mu5.Lock()
+		pair = requests.ChooseDirection(Elevator)
+		//fmt.Println(5, 1)
+		//fmt.Println(5, 1)
 		defer requests.Mu5.Unlock()
 		Elevator.Dirn = pair.Dirn
 		Elevator.Behaviour = pair.Behaviour
@@ -119,16 +121,19 @@ func OnDoorTimeout(timer_start chan time.Duration, requestUpdatesChan chan reque
 			timer_start <- Elevator.DoorOpenDuration
 			Elevator = requests.ClearAtCurrentFloor(Elevator)
 			setAllLights(Elevator)
+			//fmt.Println(5, 2)
 
 		case elevator.MOVING:
 			elevio.SetMotorDirection(Elevator.Dirn)
 			elevio.SetDoorOpenLamp(false)
+			//fmt.Println(5, 2)
 
 		case elevator.IDLE:
 			elevio.SetDoorOpenLamp(true)
 			timer_start <- Elevator.DoorOpenDuration
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(Elevator.Dirn)
+			//fmt.Println(5, 2)
 		}
 		
 	default:

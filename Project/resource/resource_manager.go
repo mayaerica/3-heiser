@@ -37,9 +37,11 @@ func PrintElevators() {
     fmt.Println("Elevator Information:")
 
     // Iterate through the elevators array and print details
+	fmt.Println(-3, 1)
 	mu.Lock()
 	elevatorlist := elevators
 	mu.Unlock()
+	fmt.Println(-3, 2)
 	
     for _, elevator := range elevatorlist {/*
         if elevator.Id == fsm.Elevator.Id {
@@ -187,10 +189,13 @@ func ConvertRequestToHRAInput(elevators []elevator.Elevator) HRAInput {
 
 func UpdateFromMessage(msg messageProcessing.Message, callUpdatesChan chan requests.CallUpdate) {
     id := msg.Elevator.Id
-    if id != fsm.Elevator.Id {
+	requests.Mu5.Lock()
+	elevator := fsm.Elevator
+	requests.Mu5.Unlock()
+    if id != elevator.Id {
         for floor := 0; floor < 4; floor++ {
             for button := 0; button < 2; button++ {
-				if msg.Elevator.HandledBy[floor][button]  != "Done"  && msg.Elevator.HallCalls[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done" { //adds hallcall and handled by to update handledby
+				if msg.Elevator.HandledBy[floor][button]  != "Done"  && msg.Elevator.HallCalls[floor][button] && elevator.HandledBy[floor][button] != "Done" { //adds hallcall and handled by to update handledby
 					callUpdatesChan <- requests.CallUpdate{
 						Floor: floor,
 						Button: button,
@@ -230,7 +235,7 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 		select {
 		case updatedRequest := <-requestUpdateChan:
 			var elevator elevator.Elevator
-			fmt.Println(10,1)
+			//fmt.Println(10,1)
 			requests.Mu5.Lock()  // Lock once for handling the request
 			if updatedRequest.Delete {
 				fsm.Elevator.Requests[updatedRequest.Floor][updatedRequest.Button] = false
@@ -245,36 +250,37 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 						fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] = updatedRequest.HandledBy
 					}
 				}
-				elevator = fsm.Elevator
-				requests.Mu5.Unlock() //unlocks for this if statement
-				
-			fmt.Println(10,2)
 
 			} else {
-				if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy {
+				if updatedRequest.Button != 2 {
+					if fsm.Elevator.HandledBy[updatedRequest.Floor][updatedRequest.Button] == updatedRequest.HandledBy && fsm.Elevator.Id == updatedRequest.HandledBy {
+						
+						fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan)
+						//fmt.Println(10,2)
+					
+					}
+				} else {
 					
 					fsm.OnRequestButtonPress(updatedRequest.Floor, elevio.ButtonType(updatedRequest.Button), TimerStartChan)
-					elevator = fsm.Elevator
-					requests.Mu5.Unlock() 
+
 					
-					fmt.Println(10,2)
-				} else {
-					elevator = fsm.Elevator
-					requests.Mu5.Unlock() //Unlocks if elevator does not want request yet
-					
-					fmt.Println(10,2)
 				}
 			}
-			fmt.Println(3,1)
+			//fmt.Println(3,1)
+
+			elevator = fsm.Elevator
+			requests.Mu5.Unlock() //Unlocks if elevator does not want request yet
+
+			
 			mu.Lock()
 			num, _ := strconv.Atoi(elevator.Id)
 			elevators[num-8081] = elevator
 			mu.Unlock()
-			fmt.Println(3,2)
+			//fmt.Println(3,2)
 			
 
 		case updatedCall := <-callUpdatesChan:
-			
+			//fmt.Println(-1, 1)
 			requests.Mu5.Lock()  // Lock once for handling the call update
 			
 			// Perform updates
@@ -295,17 +301,20 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 			}
 			elevator := fsm.Elevator
 			requests.Mu5.Unlock()  // Unlock after completing the call update logic
-
-			fmt.Println(1,1)
+			//fmt.Println(-1, 2)
+			
+			//fmt.Println(-2,1)
+			//venter her 
 			mu.Lock()
 			num, _ := strconv.Atoi(elevator.Id)
 			elevators[num-8081] = elevator
 			mu.Unlock()
-			fmt.Println(1,2)
+			//fmt.Println(-2,2)
 			
 		}
 	}
 }
+
 	/*
 
 
@@ -315,7 +324,7 @@ func UpdateElevator(callUpdatesChan chan requests.CallUpdate, TimerStartChan cha
 		if error == nil {
 			elevators[num-8081] = fsm.Elevator
 		} else {
-			fmt.Println("Error in UpdateFromMessage: ", error)
+			//fmt.Println("Error in UpdateFromMessage: ", error)
 		}
 		requests.Mu5.Unlock()
 	}
@@ -327,18 +336,21 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 	
 	for {
 		// fmt.Printf("str2: %q\n", elevators[1].HandledBy[2][0]) // This prints "8087" (quoted string)
-		fmt.Println(2,1)
-		mu.RLock()
+		//fmt.Println(1,1)
+		
+		//fmt.Println("kakkas")
 		for floor := 0; floor < 4; floor++ { 
 			for button := 0; button < 2; button++ {
-				fmt.Println("mu5",1)
+				//fmt.Println(0,1)
 				requests.Mu5.Lock()
 				
 				if fsm.Elevator.HandledBy[floor][button] == fsm.Elevator.Id { //Checks if local elevator wants call
-					
+					mu.RLock()
 					if numActiveElevators > 1 {
 						agreedOnFloor := 1
 						
+						
+		
 						for _,elevator := range elevators {
 							
 							//checks if elevators agree that elevator should take the call
@@ -346,12 +358,13 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 								agreedOnFloor++
 							}
 						}
+						mu.RUnlock()
 
 
 						if agreedOnFloor >= 2 && !fsm.Elevator.Requests[floor][button] && fsm.Elevator.HandledBy[floor][button] != "Done" {
 							id := fsm.Elevator.Id
 							requests.Mu5.Unlock()
-							fmt.Println("mu5",20)
+							//fmt.Println(0,21)
 							
 							requestUpdateChan <- requests.CallUpdate{
 								Floor: floor,
@@ -360,8 +373,9 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 								Delete: false,
 							}
 						} else {
+							//fmt.Println(0,22)
 							requests.Mu5.Unlock()
-							fmt.Println("mu5",21)
+							//fmt.Println(0,22)
 							requestUpdateChan <- requests.CallUpdate{
 								Floor: floor,
 								Button: button,
@@ -370,24 +384,28 @@ func RequestUpdater (TimerStartChan chan time.Duration, callUpdatesChan chan req
 							}
 						}
 					} else {
+							mu.RUnlock()
+
 							id := fsm.Elevator.Id
+							//fmt.Println(0,23, "send message")
 							requests.Mu5.Unlock()
-							fmt.Println("mu5",22)
+							//fmt.Println(0,23, "send message")
 							requestUpdateChan <- requests.CallUpdate{
 							Floor: floor,
 							Button: button,
 							HandledBy: id,
 							Delete: false,
 						}
+						//fmt.Println("done message")
 					}
 				} else {
 					requests.Mu5.Unlock()
-					fmt.Println("mu5",23)
+					//fmt.Println(0,24)
 				}
 			}
 		}
-		fmt.Println(2,2,"yYEYEYE")
-		mu.RUnlock()
+		//fmt.Println(1,2,"yeyeyeye")
+		
 		
 
 	}
@@ -452,7 +470,7 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 		activeElevators := []elevator.Elevator{}
 
 		// Lock for reading elevators and ElevatorStatus
-		fmt.Println(5,1)
+		//fmt.Println(3,1)
 		mu.RLock()
 		
 		for _, elevator := range elevators {
@@ -465,13 +483,13 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 		// Unlock after reading elevators and ElevatorStatus
 		
 		mu.RUnlock()
-		fmt.Println(5,2)
+		//fmt.Println(3,2)
 		// Lock to write to numActiveElevators
-		fmt.Println(4,1)
+		//fmt.Println(4,1)
 		mu.Lock() // Lock to write to shared resource
 		numActiveElevators = len(activeElevators)
 		mu.Unlock() // Unlock after writing
-		fmt.Println(4,2)
+		//fmt.Println(4,2)
 
 		if numActiveElevators != 0 {
 			// fmt.Println("fem", activeElevators)
@@ -489,6 +507,7 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 				for floor, buttons := range floorButtonStates {
 					for button, buttonState := range buttons {
 						agreedDone := 0
+						//fmt.Println(2, 1)
 						requests.Mu5.Lock()
 						
 						for _, elevator := range activeElevators {
@@ -500,20 +519,22 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 						}
 						if agreedDone>= numActiveElevators {
 							requests.Mu5.Unlock() //unlocks to send message
+							//fmt.Println(2, 2)
 							callUpdatesChan <- requests.CallUpdate{
 								Floor:     floor,
 								Button:    button,
 								HandledBy: "Done",
 								Delete:    true,
 							}
-							fmt.Println("1")
+							//fmt.Println(2, 11)
 							requests.Mu5.Lock()
-							fmt.Println("1,1")
+							//fmt.Println(2, 11)
 						}
 
 						if buttonState && fsm.Elevator.HandledBy[floor][button] != "Done" && fsm.Elevator.HallCalls[floor][button] {
 							
 							requests.Mu5.Unlock() // Unlock after reading fsm.Elevator
+							//fmt.Println(2, 2)
 								// Ensure elevatorID slicing works correctly
 							callUpdatesChan <- requests.CallUpdate{
 								Floor:     floor,
@@ -524,6 +545,7 @@ func ResourceManager(TimerStartChan chan time.Duration, callUpdatesChan chan req
 							
 						} else {
 							requests.Mu5.Unlock()
+							//fmt.Println(2, 2)
 						}
 					}
 				}
