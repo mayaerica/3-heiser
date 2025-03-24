@@ -50,8 +50,8 @@ var GlobalPerspective Perspective
 type ClearRequestVariant int
 
 const (
-	CV_All    ClearRequestVariant = iota
-	CV_InDirn 
+	CV_All ClearRequestVariant = iota
+	CV_InDirn
 )
 
 // Checks if the elevator should stop at the given floor based on requests.
@@ -95,5 +95,3 @@ func (e *Elevator) HasRequestsBelow(floor int) bool {
 	}
 	return false
 }
-
-

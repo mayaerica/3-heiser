@@ -9,7 +9,7 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 	obstructionChan := make(chan bool)
 	go elevio.PollObstructionSwitch(obstructionChan)
 
-	for{
+	for {
 		select {
 		case <-doorOpen:
 			elevio.SetDoorOpenLamp(true)

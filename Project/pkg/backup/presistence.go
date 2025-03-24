@@ -1,27 +1,27 @@
 package backup
 
 import (
-	"encoding/json"
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"encoding/json"
 	"os"
 )
 
 const backupFile = "backup.json"
 
-//only cab requests are saved
-func SaveCabRequests(elevator common.Elevator){
+// only cab requests are saved
+func SaveCabRequests(elevator common.Elevator) {
 	var cabRequests [common.N_FLOORS]bool
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		cabRequests[floor] = elevator.Requests[floor][elevio.BT_Cab]
 	}
-	data, _:= json.Marshal(elevator.Requests)
+	data, _ := json.Marshal(elevator.Requests)
 	os.WriteFile(backupFile, data, 0644)
 }
 
-//load the saved cab requests and merge it into elevator state
-func LoadCabRequests(elevator *common.Elevator){
-	data, err:= os.ReadFile(backupFile)
+// load the saved cab requests and merge it into elevator state
+func LoadCabRequests(elevator *common.Elevator) {
+	data, err := os.ReadFile(backupFile)
 	if err != nil {
 		return
 	}
@@ -35,4 +35,3 @@ func LoadCabRequests(elevator *common.Elevator){
 		}
 	}
 }
-	

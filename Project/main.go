@@ -21,8 +21,8 @@ func main() {
 	}
 
 	if os.Args[1] == "--auto" {
-		ip, err :=localip.LocalIP()
-		if err!=nil{
+		ip, err := localip.LocalIP()
+		if err != nil {
 			fmt.Println("could not get local IP:", err)
 			return
 		}
@@ -30,9 +30,9 @@ func main() {
 	} else {
 		myID = os.Args[1]
 	}
-	
+
 	fmt.Printf("Elevator starting with ID: %s\n", myID)
-	
+
 	//func Init(address string, numFloors int)
 	elevio.Init("localhost:15657", elevio.N_FLOORS)
 

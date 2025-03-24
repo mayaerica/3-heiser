@@ -22,19 +22,18 @@ type HRAInput struct {
 	States       map[string]HRAElevState  `json:"states"`
 }
 
-
 func CreateHRAInput(states map[string]common.Elevator, hall [common.N_FLOORS][2]bool) HRAInput {
 	out := HRAInput{
 		HallRequests: hall,
 		States:       make(map[string]HRAElevState),
 	}
 
-	for id, elev:= range states{
+	for id, elev := range states {
 		out.States[id] = HRAElevState{
-			Behaviour:    utils.BehaviourToString(elev.Behaviour),
-			Floor:        elev.Floor,
-			Direction:    utils.DirectionToString(elev.Dirn),
-			CabRequests:  extractCabRequests(elev),
+			Behaviour:   utils.BehaviourToString(elev.Behaviour),
+			Floor:       elev.Floor,
+			Direction:   utils.DirectionToString(elev.Dirn),
+			CabRequests: extractCabRequests(elev),
 		}
 	}
 	return out
@@ -44,9 +43,12 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 
 	hraExecutable := ""
 	switch runtime.GOOS {
-	case "linux" :  hraExecutable = "hall_request_assigner"
-	case "windows": hraExecutable = "hall_request_assigner.exe"
-	default:        panic("Unsupported OS")
+	case "linux":
+		hraExecutable = "hall_request_assigner"
+	case "windows":
+		hraExecutable = "hall_request_assigner.exe"
+	default:
+		panic("Unsupported OS")
 	}
 
 	jsonBytes, err := json.Marshal(currentInput)
@@ -77,7 +79,6 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 
 	return output
 }
-
 
 func extractCabRequests(e common.Elevator) []bool {
 	cabRequests := make([]bool, common.N_FLOORS)

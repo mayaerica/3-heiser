@@ -3,13 +3,12 @@ package utils
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
-	"strconv"
 	"fmt"
+	"strconv"
 )
 
-
 func BehaviourToString(b common.ElevatorBehaviour) string {
-	switch b{
+	switch b {
 	case common.IDLE:
 		return "idle"
 	case common.MOVING:
