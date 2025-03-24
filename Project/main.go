@@ -10,6 +10,7 @@ import (
 
 func main() {
 	var myID string
+	fmt.Println("hi")
 
 	// Usage:
 	//   go run main.go 0        → [manually] set elevator ID to "0"
@@ -35,14 +36,14 @@ func main() {
 
 	//func Init(address string, numFloors int)
 	elevio.Init("localhost:15657", elevio.N_FLOORS)
-
+	
 	control.InitFSM(myID)
-	control.InitDispatcher(myID, control.Elevator)
+
 	go control.StartDispatcherLoop(
 		myID,
 		control.HallCallRequestChan,
 		control.AssignedHallCallChan,
 	)
 
-	select {}
+	select{}
 }

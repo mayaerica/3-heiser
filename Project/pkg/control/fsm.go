@@ -5,10 +5,12 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
 	"elevatorlab/pkg/control/indicators"
+	"sync"
 	"fmt"
 	"time"
 )
 
+var elevator_mutex sync.Mutex
 var Elevator common.Elevator
 
 // Channel for transitioning FSM states (IDLE, MOVING, DOOR_OPEN)
@@ -54,18 +56,27 @@ func InitFSM(elevatorID string) {
 	}
 
 	backup.LoadCabRequests(&Elevator)
-
+	InitDispatcher(Elevator.ID, Elevator)
+	
 	go StateMachineLoop()
 	go executionLoop()
 	go DoorFSM(DoorOpenChan, DoorCloseChan, Elevator.DoorOpenDuration)
+
+	
 }
 
 func StateMachineLoop() {
 	for {
 		select {
 		case state := <-StateChan:
+			fmt.Println(1,1)
+			elevator_mutex.Lock()
+			fmt.Println(1,1)
 			Elevator.Behaviour = state
+			fmt.Println("what")
 			handleState()
+			elevator_mutex.Unlock()
+			fmt.Println(1,2)
 		}
 	}
 }
@@ -80,7 +91,12 @@ func executionLoop() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
+			fmt.Println(2,1)
+			elevator_mutex.Lock()
+			fmt.Println(2,1)
 			PrintElevatorState()
+			elevator_mutex.Unlock()
+			fmt.Println(2,2)
 		}
 	}()
 
@@ -90,9 +106,15 @@ func executionLoop() {
 		select {
 		case buttonPress := <-buttonPressChan:
 			fmt.Printf("[BTNPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
+			fmt.Println(3,1)
+			elevator_mutex.Lock()
 			handleButtonPress(buttonPress, &prevDirn)
+			elevator_mutex.Unlock()
+			fmt.Println(3,2)
 
 		case assignedBtn := <-AssignedHallCallChan:
+			fmt.Println(4,1)
+			elevator_mutex.Lock()
 			Elevator.Requests[assignedBtn.Floor][assignedBtn.Button] = true
 			indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
 			if Elevator.Behaviour == common.IDLE {
@@ -103,8 +125,12 @@ func executionLoop() {
 					prevDirn = next.Dirn
 				}
 			}
+			elevator_mutex.Unlock()
+			fmt.Println(4,2)
 
 		case floor := <-floorSensorChan:
+			fmt.Println(5,1)
+			elevator_mutex.Lock()
 			Elevator.Floor = floor
 			elevio.SetFloorIndicator(floor)
 
@@ -114,13 +140,19 @@ func executionLoop() {
 				Elevator.Dirn = elevio.MD_Stop
 				SendCompletedHallRequests(Elevator)
 				ClearRequestsAtCurrentFloor(&Elevator)
-				indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
+				indicators.UpdateAllLights(Elevator, common.GetGlobalPerspective().Perspective)
 				DoorOpenChan <- struct{}{}
 			}
+			elevator_mutex.Unlock()
+			fmt.Println(5,2)
 
 		case <-DoorCloseChan:
+			fmt.Println(6,1)
+			elevator_mutex.Lock()
 			next := ChooseDirection(Elevator, prevDirn)
 			Elevator.Dirn = next.Dirn
+			elevator_mutex.Unlock()
+			fmt.Println(6,2)
 			StateChan <- next.Behaviour
 			if next.Dirn != elevio.MD_Stop {
 				prevDirn = next.Dirn
@@ -132,6 +164,8 @@ func executionLoop() {
 func handleButtonPress(buttonPress elevio.ButtonEvent, prevDirn *elevio.Dirn) {
 	switch buttonPress.Button {
 	case elevio.BT_Cab:
+		fmt.Println(7,1)
+		elevator_mutex.Lock()
 		Elevator.Requests[buttonPress.Floor][elevio.BT_Cab] = true
 		backup.SaveCabRequests(Elevator)
 		indicators.UpdateAllLights(Elevator, common.GlobalPerspective.Perspective)
@@ -144,6 +178,8 @@ func handleButtonPress(buttonPress elevio.ButtonEvent, prevDirn *elevio.Dirn) {
 				*prevDirn = dirnPair.Dirn
 			}
 		}
+		elevator_mutex.Unlock()
+		fmt.Println(7,2)
 	case elevio.BT_HallUp, elevio.BT_HallDown:
 		HallCallRequestChan <- buttonPress
 	}

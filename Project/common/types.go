@@ -2,6 +2,7 @@ package common
 
 import (
 	"elevatorlab/elevio"
+	"sync"
 	"time"
 )
 
@@ -42,10 +43,25 @@ const (
 
 type Perspective struct {
 	ID          string
+	OrderID [N_FLOORS][2]string
 	Perspective [N_FLOORS][2]OrderState
 }
 
 var GlobalPerspective Perspective
+var mutex sync.Mutex
+
+func UpdateGlobalPerspective(globalPerspective Perspective) {
+	mutex.Lock()
+	GlobalPerspective = globalPerspective
+	mutex.Unlock()
+}
+
+func GetGlobalPerspective() Perspective {
+	mutex.Lock()
+	globalPerspective := GlobalPerspective
+	mutex.Unlock()
+	return globalPerspective
+}
 
 type ClearRequestVariant int
 

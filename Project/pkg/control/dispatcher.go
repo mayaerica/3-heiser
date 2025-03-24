@@ -11,9 +11,12 @@ import (
 	"time"
 )
 
-var mutex sync.Mutex
+var Mutex sync.Mutex
+var Mutex2 sync.Mutex
 var ElevatorStates map[string]common.Elevator
 var HallRequests [common.N_FLOORS][2]common.OrderState
+var orderID [common.N_FLOORS][2]string
+
 
 func InitDispatcher(myID string, localElev common.Elevator) {
 	ElevatorStates = make(map[string]common.Elevator)
@@ -22,27 +25,25 @@ func InitDispatcher(myID string, localElev common.Elevator) {
 }
 
 func UpdateLocalElevatorState(e common.Elevator) {
-	mutex.Lock()
-	defer mutex.Unlock()
 	ElevatorStates[e.ID] = e
 }
 
 func UpdateOrderState(floor int, button int, state common.OrderState) {
-	mutex.Lock()
-	defer mutex.Unlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	HallRequests[floor][button] = state
 }
 
 func GetOrderState(floor int, button int) common.OrderState {
-	mutex.Lock()
-	defer mutex.Unlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	return HallRequests[floor][button]
 }
 
 func HallRequestsToBool() [common.N_FLOORS][2]bool {
 	var out [common.N_FLOORS][2]bool
-	mutex.Lock()
-	defer mutex.Unlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		for btn := 0; btn < 2; btn++ {
 			out[floor][btn] = HallRequests[floor][btn] == common.Assigned
@@ -61,11 +62,11 @@ func HallRequestsToBool() [common.N_FLOORS][2]bool {
 //   - Add the request to this elevator’s list.
 //   - Let the rest of the system know it was assigned successfully.
 func AssignRequest(floor int, button elevio.ButtonType, elevatorID string) bool {
-	mutex.Lock()
+	Mutex.Lock()
 	if HallRequests[floor][button] == common.NotRequested || HallRequests[floor][button] == common.Unknown {
 		HallRequests[floor][button] = common.Unassigned
 	}
-	mutex.Unlock()
+	Mutex.Unlock()
 
 	hraInput := hra.CreateHRAInput(ElevatorStates, HallRequestsToBool())
 	hraOutput := hra.HRAProcessor(hraInput)
@@ -74,18 +75,22 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID string) bool 
 		return false
 	}
 
-	if floorAssignments, ok := (*hraOutput)[elevatorID]; ok {
-		if floorAssignments[floor][button] {
-			fmt.Printf("[HRA] Assigned request: floor=%d, button=%d to elevator=%s\n", floor, button, elevatorID)
-			UpdateOrderState(floor, int(button), common.Assigned)
+	for elevatorID, floorAssignments := range *hraOutput {
+		for floor := 0; floor < len(floorAssignments); floor++ {
+			for button := 0; button < len(floorAssignments[floor]); button++ {
+				if floorAssignments[floor][button] {
+					fmt.Printf("[HRA] Assigned request: floor=%d, button=%d to elevator=%s\n", floor, button, elevatorID)
+					Mutex2.Lock()
+					orderID[floor][button] = elevatorID
 
-			mutex.Lock()
-			elevator := ElevatorStates[elevatorID]
-			elevator.Requests[floor][button] = true
-			ElevatorStates[elevatorID] = elevator
-			mutex.Unlock()
-
-			return true
+					Mutex2.Unlock()
+					UpdateOrderState(floor, int(button), common.Assigned)
+				} else {
+					Mutex2.Lock()
+					orderID[floor][button] = ""
+					Mutex2.Unlock()
+				}
+			}
 		}
 	}
 
@@ -98,7 +103,7 @@ func AssignRequest(floor int, button elevio.ButtonType, elevatorID string) bool 
 // It does this by:
 // 1. Listening to all local and remote button presses.
 // 2. Sharing this elevator’s view (Perspective) with the others over the network.
-// 3. Collecting the other elevators' perspectives.
+// 3. Collecting the other elevators' perspectives.Variant: common.CV_All,DoorOpenDuration:    3 * time.Second,
 // 4. Promoting requests to 'Assigned' only when ALL elevators agree a button has been pressed.
 // 5. When a request is completed (an elevator serves the call), it clears it across the network.
 //
@@ -138,21 +143,30 @@ func Synchronizer(myID string) {
 				for btn := 0; btn < 2; btn++ {
 					switch theirs.Perspective[floor][btn] {
 					case common.NotRequested:
-						if ours[floor][btn] == common.Assigned || ours[floor][btn] == common.Unknown {
+						if (ours[floor][btn] == common.Assigned || ours[floor][btn] == common.Unknown) && theirs.OrderID[floor][btn] == "Done" {
 							ours[floor][btn] = common.NotRequested
 						}
+
 					case common.Unassigned:
-						halfCount := 0
-						for _, p := range perspectiveMap {
-							if p.Perspective[floor][btn] == common.Unassigned {
-								halfCount++
+						if ours[floor][btn] == common.NotRequested || ours[floor][btn] == common.Unknown {
+							ours[floor][btn] = common.Unassigned
+							//requestChan <-elevio.ButtonEvent{Floor: floor, Button: elevio.ButtonType(btn)}
+						}
+						
+					case common.Assigned:
+						agreeCount := 0
+						for _, p := range perspectiveMap { 
+							if p.OrderID[floor][btn] == myID {
+								agreeCount++
 							}
 						}
-						if halfCount == len(peerList.Peers) {
-							ours[floor][btn] = common.Assigned
+
+						if agreeCount == len(peerList.Peers) { 
+							//elevator[floor][btn] = common.Assigned
+							
 						}
-					case common.Assigned:
 						ours[floor][btn] = common.Assigned
+
 					case common.Unknown:
 						if ours[floor][btn] == common.NotRequested {
 							ours[floor][btn] = common.Unknown
@@ -167,11 +181,16 @@ func Synchronizer(myID string) {
 			}
 
 		case <-ticker.C:
-			common.GlobalPerspective = common.Perspective{
+			Mutex.Lock()
+			Mutex2.Lock()
+			common.UpdateGlobalPerspective(common.Perspective{
 				ID:          myID,
+				OrderID:    orderID,
 				Perspective: ours,
-			}
-			perspectiveTx <- common.GlobalPerspective
+			})
+			Mutex2.Unlock()
+			Mutex.Unlock()
+			perspectiveTx <- common.GetGlobalPerspective()
 			UpdateOrderStateFromSync(ours)
 		}
 	}
@@ -188,8 +207,8 @@ func CreateAssignedHallRequests(perspective [common.N_FLOORS][2]common.OrderStat
 }
 
 func UpdateOrderStateFromSync(syncData [common.N_FLOORS][2]common.OrderState) {
-	mutex.Lock()
-	defer mutex.Unlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		for btn := 0; btn < 2; btn++ {
@@ -204,7 +223,8 @@ func StartDispatcherLoop(myID string, requestChan <-chan elevio.ButtonEvent, ass
 			success := AssignRequest(btn.Floor, btn.Button, myID)
 			if success {
 				assignChan <- btn
-			}
+			}	
+			
 		}
 	}()
 }
