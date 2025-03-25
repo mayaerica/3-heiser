@@ -101,31 +101,64 @@ func executionLoop(myID string) {
 }
 
 func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn) {
+	fmt.Printf("[BTN] Button pressed: floor=%d, type=%v\n", btn.Floor, btn.Button)
+
 	switch btn.Button {
 	case elevio.BT_Cab:
+		// CAB CALLS are handled locally
 		WithMyElevator(myID, func(e *common.Elevator) {
 			e.Requests[btn.Floor][elevio.BT_Cab] = true
 		})
 		backup.SaveCabRequests(GetMyElevator(myID))
 		UpdateCabLights(GetMyElevator(myID))
 
-		if GetMyElevator(myID).Behaviour == common.IDLE {
-			dirnPair := ChooseDirection(GetMyElevator(myID), *prevDirn)
-			WithMyElevator(myID, func(e *common.Elevator) {
-				e.Dirn = dirnPair.Dirn
-			})
-			elevio.SetMotorDirection(dirnPair.Dirn)
-			StateChan <- dirnPair.Behaviour
-			if dirnPair.Dirn != elevio.MD_Stop {
-				*prevDirn = dirnPair.Dirn
+		switch GetMyElevator(myID).Behaviour {
+		case common.DOOR_OPEN:
+			if elevio.GetFloor() == btn.Floor && ShouldClearImmediately(GetMyElevator(myID), btn.Floor, btn.Button) {
+				fmt.Println("[DOOR_OPEN] Clearing cab request at current floor.")
+				ClearRequestsAtCurrentFloor(myID)
+				UpdateCabLights(GetMyElevator(myID))
+				DoorOpenChan <- struct{}{}
 			}
+
+		case common.IDLE:
+			pair := ChooseDirection(GetMyElevator(myID), *prevDirn)
+			WithMyElevator(myID, func(e *common.Elevator) {
+				e.Dirn = pair.Dirn
+			})
+
+			switch pair.Behaviour {
+			case common.DOOR_OPEN:
+				fmt.Println("[IDLE] Opening door immediately at current floor.")
+				ClearRequestsAtCurrentFloor(myID)
+				UpdateCabLights(GetMyElevator(myID))
+				elevio.SetDoorOpenLamp(true)
+				StateChan <- common.DOOR_OPEN
+				DoorOpenChan <- struct{}{}
+
+			case common.MOVING:
+				fmt.Println("[IDLE] Starting to move.")
+				elevio.SetMotorDirection(pair.Dirn)
+				StateChan <- common.MOVING
+				*prevDirn = pair.Dirn
+
+			case common.IDLE:
+				fmt.Println("[IDLE] No direction chosen. Staying idle.")
+				StateChan <- common.IDLE
+			}
+
+		case common.MOVING:
+			// Request has been stored — will be handled by FSM
 		}
 
 	case elevio.BT_HallUp, elevio.BT_HallDown:
+		// HALL CALLS go to the assigner
+		fmt.Println("[HALL] Forwarding hall request to assigner.")
 		AssignerInput <- AssignerMsg{Type: "hall_call", Data: btn}
 		AssignerInput <- AssignerMsg{Type: "assign", Data: btn}
 	}
 }
+
 
 func handleState(myID string) {
 	switch GetMyElevator(myID).Behaviour {
