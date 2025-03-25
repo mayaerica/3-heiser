@@ -4,108 +4,64 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
-	"elevatorlab/pkg/control/indicators"
 	"fmt"
 	"time"
 )
 
-// Channel for transitioning FSM states (IDLE, MOVING, DOOR_OPEN)
 var StateChan = make(chan common.ElevatorBehaviour)
-
-// Signal to open the elevator door
 var DoorOpenChan = make(chan struct{})
-
-// Signal that the door has closed and FSM can proceed
 var DoorCloseChan = make(chan struct{})
-
-// New hall call request received from button press
-var HallCallRequestChan = make(chan elevio.ButtonEvent)
-
-// A hall call has been assigned to this elevator by the dispatcher
 var AssignedHallCallChan = make(chan elevio.ButtonEvent)
-
-// A hall call has just been completed. Please remove it from the network's shared state
 var OrderCompleteChan = make(chan elevio.ButtonEvent)
 
-func InitFSM(elevatorID string) {
-	detectedFloor := elevio.GetFloor()
+func InitFSM(myID string, initial common.Elevator) {
+	backup.LoadCabRequests(&initial)
 
-	e := common.Elevator{
-		ID:                  elevatorID,
-		Behaviour:           common.IDLE,
-		Dirn:                elevio.MD_Stop,
-		Floor:               detectedFloor,
-		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3 * time.Second,
-	}
+	ElevSet <- ElevSetMsg{Fn: func(m map[string]common.Elevator) {
+		m[myID] = initial
+	}}
 
-	if detectedFloor == -1 {
-		fmt.Println("Starting inbetween floors -> moving down to find floor...")
-		elevio.SetMotorDirection(elevio.MD_Down)
-		e.Behaviour = common.MOVING
-		e.Dirn = elevio.MD_Down
-	} else {
-		fmt.Println("Starting at floor", detectedFloor)
-		elevio.SetFloorIndicator(detectedFloor)
-		e.Behaviour = common.IDLE
-		e.Dirn = elevio.MD_Stop
-	}
-
-	SetLocalElevator(e)
-	backup.LoadCabRequests(&e)
-	SetLocalElevator(e)
-
-	go StateMachineLoop()
-	go executionLoop()
-	go DoorFSM(DoorOpenChan, DoorCloseChan, e.DoorOpenDuration)
+	go StateMachineLoop(myID)
+	go executionLoop(myID)
+	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration)
 }
 
-func StateMachineLoop() {
-	for {
-		select {
-		case state := <-StateChan:
-			UpdateLocalElevator(func(e *common.Elevator) {
-				e.Behaviour = state
-			})
-			handleState()
-		}
+func StateMachineLoop(myID string) {
+	for state := range StateChan {
+		WithMyElevator(myID, func(e *common.Elevator) {
+			e.Behaviour = state
+		})
+		handleState(myID)
 	}
 }
 
-func executionLoop() {
+func executionLoop(myID string) {
 	buttonPressChan := make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
 
 	go elevio.PollButtons(buttonPressChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		for range ticker.C {
-			PrintElevatorState()
-		}
-	}()
-
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	for {
 		select {
-		case buttonPress := <-buttonPressChan:
-			fmt.Printf("[BTNPRESSED] Floor: %d, Button: %v\n", buttonPress.Floor, buttonPress.Button)
-			handleButtonPress(buttonPress, &prevDirn)
+		case btn := <-buttonPressChan:
+			handleButtonPress(myID, btn, &prevDirn)
 
-		case assignedBtn := <-AssignedHallCallChan:
-			UpdateLocalElevator(func(e *common.Elevator) {
-				e.Requests[assignedBtn.Floor][assignedBtn.Button] = true
+		case assigned := <-AssignedHallCallChan:
+			WithMyElevator(myID, func(e *common.Elevator) {
+				e.Requests[assigned.Floor][assigned.Button] = true
 			})
-			indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
+			UpdateCabLights(GetMyElevator(myID))
 
-			if GetLocalElevator().Behaviour == common.IDLE {
-				e := GetLocalElevator()
+			if GetMyElevator(myID).Behaviour == common.IDLE {
+				e := GetMyElevator(myID)
 				next := ChooseDirection(e, prevDirn)
-				UpdateLocalElevator(func(e *common.Elevator) {
+				WithMyElevator(myID, func(e *common.Elevator) {
 					e.Dirn = next.Dirn
 				})
+				elevio.SetMotorDirection(next.Dirn)
 				StateChan <- next.Behaviour
 				if next.Dirn != elevio.MD_Stop {
 					prevDirn = next.Dirn
@@ -113,29 +69,29 @@ func executionLoop() {
 			}
 
 		case floor := <-floorSensorChan:
-			UpdateLocalElevator(func(e *common.Elevator) {
+			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = floor
 			})
 			elevio.SetFloorIndicator(floor)
 
-			if RequestShouldStop(GetLocalElevator()) {
+			if RequestShouldStop(GetMyElevator(myID)) {
 				StopElevator()
-				UpdateLocalElevator(func(e *common.Elevator) {
+				WithMyElevator(myID, func(e *common.Elevator) {
 					e.Behaviour = common.DOOR_OPEN
 					e.Dirn = elevio.MD_Stop
 				})
-				SendCompletedHallRequests(GetLocalElevator())
-				ClearRequestsAtCurrentFloor()
-				indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
+				ClearRequestsAtCurrentFloor(myID)
+				UpdateCabLights(GetMyElevator(myID))
 				DoorOpenChan <- struct{}{}
 			}
 
 		case <-DoorCloseChan:
-			e := GetLocalElevator()
+			e := GetMyElevator(myID)
 			next := ChooseDirection(e, prevDirn)
-			UpdateLocalElevator(func(e *common.Elevator) {
+			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
 			})
+			elevio.SetMotorDirection(next.Dirn)
 			StateChan <- next.Behaviour
 			if next.Dirn != elevio.MD_Stop {
 				prevDirn = next.Dirn
@@ -144,66 +100,69 @@ func executionLoop() {
 	}
 }
 
-func handleButtonPress(buttonPress elevio.ButtonEvent, prevDirn *elevio.Dirn) {
-	switch buttonPress.Button {
+func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn) {
+	switch btn.Button {
 	case elevio.BT_Cab:
-		UpdateLocalElevator(func(e *common.Elevator) {
-			e.Requests[buttonPress.Floor][elevio.BT_Cab] = true
+		WithMyElevator(myID, func(e *common.Elevator) {
+			e.Requests[btn.Floor][elevio.BT_Cab] = true
 		})
-		backup.SaveCabRequests(GetLocalElevator())
-		indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
+		backup.SaveCabRequests(GetMyElevator(myID))
+		UpdateCabLights(GetMyElevator(myID))
 
-		if GetLocalElevator().Behaviour == common.IDLE {
-			dirnPair := ChooseDirection(GetLocalElevator(), *prevDirn)
-			UpdateLocalElevator(func(e *common.Elevator) {
+		if GetMyElevator(myID).Behaviour == common.IDLE {
+			dirnPair := ChooseDirection(GetMyElevator(myID), *prevDirn)
+			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = dirnPair.Dirn
 			})
+			elevio.SetMotorDirection(dirnPair.Dirn)
 			StateChan <- dirnPair.Behaviour
 			if dirnPair.Dirn != elevio.MD_Stop {
 				*prevDirn = dirnPair.Dirn
 			}
 		}
+
 	case elevio.BT_HallUp, elevio.BT_HallDown:
-		HallCallRequestChan <- buttonPress
+		AssignerInput <- AssignerMsg{Type: "hall_call", Data: btn}
+		AssignerInput <- AssignerMsg{Type: "assign", Data: btn}
 	}
 }
 
-func handleState() {
-	switch GetLocalElevator().Behaviour {
+func handleState(myID string) {
+	switch GetMyElevator(myID).Behaviour {
 	case common.IDLE:
-		handleIdleState()
+		handleIdleState(myID)
 	case common.MOVING:
-		handleMovingState()
+		handleMovingState(myID)
 	case common.DOOR_OPEN:
-		// no-op
+		// DoorFSM handles this
 	}
 }
 
-func handleIdleState() {
-	e := GetLocalElevator()
+func handleIdleState(myID string) {
+	e := GetMyElevator(myID)
 	next := ChooseDirection(e, e.Dirn)
-	UpdateLocalElevator(func(e *common.Elevator) {
+	WithMyElevator(myID, func(e *common.Elevator) {
 		e.Dirn = next.Dirn
 	})
+	elevio.SetMotorDirection(next.Dirn)
 	StateChan <- next.Behaviour
 }
 
-func handleMovingState() {
+func handleMovingState(myID string) {
 	for {
 		newFloor := elevio.GetFloor()
 		if newFloor != -1 {
-			UpdateLocalElevator(func(e *common.Elevator) {
+			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = newFloor
 			})
 			elevio.SetFloorIndicator(newFloor)
 
-			if RequestShouldStop(GetLocalElevator()) {
+			if RequestShouldStop(GetMyElevator(myID)) {
 				StopElevator()
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan
-				SendCompletedHallRequests(GetLocalElevator())
-				ClearRequestsAtCurrentFloor()
-				indicators.UpdateAllLights(GetLocalElevator(), common.GlobalPerspective.Perspective)
+				ClearRequestsAtCurrentFloor(myID)
+				UpdateCabLights(GetMyElevator(myID))
 				StateChan <- common.IDLE
 				return
 			}
@@ -212,23 +171,13 @@ func handleMovingState() {
 	}
 }
 
-func SendCompletedHallRequests(e common.Elevator) {
-	floor := e.Floor
-	if e.Requests[floor][elevio.BT_HallUp] {
-		OrderCompleteChan <- elevio.ButtonEvent{Floor: floor, Button: elevio.BT_HallUp}
-	}
-	if e.Requests[floor][elevio.BT_HallDown] {
-		OrderCompleteChan <- elevio.ButtonEvent{Floor: floor, Button: elevio.BT_HallDown}
-	}
-}
-
-func PrintElevatorState() {
-	e := GetLocalElevator()
+func PrintElevatorState(myID string) {
+	e := GetMyElevator(myID)
 	fmt.Println("========== Elevator State ==========")
 	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
 		e.ID, e.Floor, e.Dirn, e.Behaviour)
 
-	fmt.Println("Requests: ")
+	fmt.Println("Requests:")
 	for floor := 0; floor < common.N_FLOORS; floor++ {
 		fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
 			floor,
@@ -239,3 +188,5 @@ func PrintElevatorState() {
 	}
 	fmt.Println("====================================")
 }
+
+

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/control"
 	"elevatorlab/pkg/network/localip"
@@ -11,19 +12,15 @@ import (
 func main() {
 	var myID string
 
-	// Usage:
-	//   go run main.go 0        → [manually] set elevator ID to "0"
-	//   go run main.go --auto   → [auto-set] ID based on local IP
-
 	if len(os.Args) < 2 {
-		fmt.Println("usage: go run main.go [elevatorID] OR --auto ")
+		fmt.Println("usage: go run main.go [elevatorID] OR --auto")
 		return
 	}
 
 	if os.Args[1] == "--auto" {
 		ip, err := localip.LocalIP()
 		if err != nil {
-			fmt.Println("could not get local IP:", err)
+			fmt.Println("Could not get local IP:", err)
 			return
 		}
 		myID = ip
@@ -33,16 +30,45 @@ func main() {
 
 	fmt.Printf("Elevator starting with ID: %s\n", myID)
 
-	//func Init(address string, numFloors int)
 	elevio.Init("localhost:15657", elevio.N_FLOORS)
 
-	control.InitFSM(myID)
-	control.InitDispatcher(myID, control.GetLocalElevator())
-	go control.StartDispatcherLoop(
-		myID,
-		control.HallCallRequestChan,
-		control.AssignedHallCallChan,
-	)
+	initial := common.Elevator{
+		ID:                  myID,
+		Floor:               elevio.GetFloor(),
+		Dirn:                elevio.MD_Stop,
+		Behaviour:           common.IDLE,
+		ClearRequestVariant: common.CV_All,
+		DoorOpenDuration:    3,
+	}
+
+	if initial.Floor == -1 {
+		fmt.Println("Starting between floors. Moving down to find floor...")
+		elevio.SetMotorDirection(elevio.MD_Down)
+		for {
+			floor := elevio.GetFloor()
+			if floor != -1 {
+				elevio.SetMotorDirection(elevio.MD_Stop)
+				initial.Floor = floor
+				break
+			}
+		}
+	}
+
+	elevio.SetFloorIndicator(initial.Floor)
+
+	go control.RunElevState(myID, initial, 16570)
+	control.InitFSM(myID, initial)
+	control.InitAssigner(myID)
+
+	go func() {
+		for btn := range control.OrderCompleteChan {
+			control.AssignerInput <- control.AssignerMsg{
+				Type: "complete",
+				Data: btn,
+			}
+		}
+	}()
 
 	select {}
 }
+

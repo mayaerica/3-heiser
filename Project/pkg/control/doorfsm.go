@@ -17,16 +17,16 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 
 			for {
 				select {
-				case abnormality := <-obstructionChan:
-					if abnormality {
+				case obstructed := <-obstructionChan:
+					if obstructed {
 						timer.Reset(duration)
 					}
 				case <-timer.C:
 					if !elevio.GetObstruction() {
 						elevio.SetDoorOpenLamp(false)
-						doorClosed <- struct{}{} //notify fsm
+						doorClosed <- struct{}{}
 					} else {
-						timer.Reset(duration) //stay open until obstruction is removed
+						timer.Reset(duration)
 					}
 				}
 			}
