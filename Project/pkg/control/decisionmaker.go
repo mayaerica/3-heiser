@@ -73,17 +73,18 @@ func ClearRequestsAtCurrentFloor(myID string) {
 		f := e.Floor
 		d := e.Dirn
 
-		if e.Requests[f][elevio.BT_HallUp] {
-			OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
-		}
-		if e.Requests[f][elevio.BT_HallDown] {
-			OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
-		}
+		
 
 		switch e.ClearRequestVariant {
 		case common.CV_All:
 			for btn := 0; btn < common.N_BUTTONS; btn++ {
 				e.Requests[f][btn] = false
+				if e.Requests[f][elevio.BT_HallUp] {
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+				}
+				if e.Requests[f][elevio.BT_HallDown] {
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+				}
 			}
 
 		case common.CV_InDirn:
@@ -91,6 +92,7 @@ func ClearRequestsAtCurrentFloor(myID string) {
 
 			switch d {
 			case elevio.MD_Up:
+				fmt.Println("\n\n\n\nclearing up\n\n\n\n")
 				if !RequestsAbove(*e) {
 					e.Requests[f][elevio.BT_HallDown] = false
 					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
@@ -107,7 +109,7 @@ func ClearRequestsAtCurrentFloor(myID string) {
 				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
 
 			case elevio.MD_Stop:
-				fmt.Println("STOP")
+				fmt.Println("\n\n\n\nSTOP\n\n\n\n")
 				e.Requests[f][elevio.BT_HallUp] = false
 				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
 				e.Requests[f][elevio.BT_HallDown] = false
@@ -165,6 +167,7 @@ func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehavio
 		}
 		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 	case elevio.MD_Stop:
+		fmt.Println("MD_STOP HERE YEYE")
 		if RequestsHere(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.DOOR_OPEN}
 		} else if RequestsAbove(e) {

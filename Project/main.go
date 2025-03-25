@@ -69,6 +69,7 @@ func main() {
 	control.UpdateAllLights(initial,initalHallRequests)
 	
 
+	initial.ClearRequestVariant=common.CV_InDirn
 	go control.RunElevState(myID, initial, 16570)
 	control.InitFSM(myID, initial)
 	control.InitAssigner(myID)

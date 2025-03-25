@@ -30,6 +30,7 @@ func InitFSM(myID string, initial common.Elevator) {
 	go StateMachineLoop(myID)                                         // Controls what to do in each state
 	go executionLoop(myID)                                            // Reacts to events: buttons, floor sensor, assignments
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration) // Door opens and closes
+	go PrintElevatorState(myID)
 }
 
 func StateMachineLoop(myID string) {
@@ -43,6 +44,7 @@ func StateMachineLoop(myID string) {
 	}
 }
 
+
 func executionLoop(myID string) {
 	buttonPressChan := make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
@@ -52,7 +54,9 @@ func executionLoop(myID string) {
 
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
+
 	for {
+		
 		select {
 		// A user pressed a button (cab or hall)
 		case btn := <-buttonPressChan:
@@ -68,16 +72,28 @@ func executionLoop(myID string) {
 
 			//PrintElevatorState(myID) //added when debug blocking
 
-			UpdateCabLights(GetMyElevator(myID))
+			//UpdateCabLights(GetMyElevator(myID))
 
 			// If we’re idle, start moving or open the door immediately
 			if GetMyElevator(myID).Behaviour == common.IDLE {
 				e := GetMyElevator(myID)
-				next := ChooseDirection(e, prevDirn)
+				fmt.Println("\n\n",e,"\n\n")
+				next := ChooseDirection(e, e.Dirn)
+				fmt.Println("fem\n\n\n\n",next.Dirn)
 				WithMyElevator(myID, func(e *common.Elevator) {
 					e.Dirn = next.Dirn
 				})
+
+				if next.Dirn == 0 { //If request is at
+					ClearRequestsAtCurrentFloor(myID)
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+					DoorOpenChan <- struct{}{}
+					<-DoorCloseChan // Wait for door to fully close before moving again
+					DoorOpenChan <- struct{}{}
+				}
 				elevio.SetMotorDirection(next.Dirn)
+				fmt.Println("doon")
 				//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 
 				select {
@@ -92,6 +108,8 @@ func executionLoop(myID string) {
 		//Elevator arrived at a new floor
 		case floor := <-floorSensorChan:
 			fmt.Println("Floor sensor has been activated")
+			elevio.SetFloorIndicator(floor)
+			
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = floor
 			})
@@ -105,20 +123,17 @@ func executionLoop(myID string) {
 				StopElevator()
 				WithMyElevator(myID, func(e *common.Elevator) {
 					e.Behaviour = common.DOOR_OPEN
-					e.Dirn = elevio.MD_Stop
 				})
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan // Wait for door to fully close before moving again
-				
+				DoorOpenChan <- struct{}{}
 
 				//why struct? its used if you don't care about
 				// sending actual data, but just want
 				// to signal something
-				fmt.Println("doorchan 2")
 				DoorOpenChan <- struct{}{}
-				fmt.Println("doorchan 2 done")
 			}
 			/*
 			if !RequestsAbove(GetMyElevator(myID)) && !RequestsHere(GetMyElevator(myID)) {
@@ -126,7 +141,7 @@ func executionLoop(myID string) {
 				StateChan <- common.IDLE
 				fmt.Println("Done setting IDLE \n\n\n\n\n\n")
 			}*/
-			PrintElevatorState(myID)
+			//PrintElevatorState(myID)
 
 		// Door closed after timeout — pick next action
 		case <-DoorCloseChan:
@@ -135,6 +150,7 @@ func executionLoop(myID string) {
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
 			})
+			fmt.Println(3)
 			elevio.SetMotorDirection(next.Dirn)
 			//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 			select {
@@ -163,7 +179,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 		UpdateCabLights(GetMyElevator(myID))
 
 		//PrintElevatorState(myID) //added when debug blocking
-
 		// React based on current state
 		switch GetMyElevator(myID).Behaviour {
 		case common.DOOR_OPEN:
@@ -172,9 +187,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				fmt.Println("[DOOR_OPEN] Clearing cab request at current floor.")
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
-				fmt.Println("doorchan 1")
 				DoorOpenChan <- struct{}{}
-				fmt.Println("doorchan 1 done")
 			}
 
 		case common.IDLE:
@@ -200,6 +213,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 
 			case common.MOVING:
 				fmt.Println("[IDLE] Starting to move.")
+				fmt.Println(2)
 				elevio.SetMotorDirection(pair.Dirn)
 				//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 				select {
@@ -251,6 +265,8 @@ func handleIdleState(myID string) {
 		e.Dirn = next.Dirn
 		e.Behaviour = next.Behaviour
 	})
+	fmt.Println("help")
+	fmt.Println(1, next.Dirn)
 	elevio.SetMotorDirection(next.Dirn)
 	//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 
@@ -264,12 +280,13 @@ func handleMovingState(myID string) {
 			})
 			e := GetMyElevator(myID)
 			
-			elevio.SetFloorIndicator(newFloor)
+			
 			next := ChooseDirection(e, e.Dirn)
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
 				e.Behaviour = next.Behaviour
 			})
+			
 
 			/*if RequestShouldStop(GetMyElevator(myID)) {
 				StopElevator()
@@ -291,19 +308,24 @@ func handleMovingState(myID string) {
 }
 
 func PrintElevatorState(myID string) {
-	e := GetMyElevator(myID)
-	fmt.Println("========== Elevator State ==========")
-	fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
-		e.ID, e.Floor, e.Dirn, e.Behaviour)
+	
+	
+	for {
+		e := GetMyElevator(myID)
+		time.Sleep(250*time.Millisecond)
+		fmt.Println("========== Elevator State ==========")
+		fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
+			e.ID, e.Floor, e.Dirn, e.Behaviour)
 
-	fmt.Println("Requests:")
-	for floor := 0; floor < common.N_FLOORS; floor++ {
-		fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
-			floor,
-			e.Requests[floor][elevio.BT_Cab],
-			e.Requests[floor][elevio.BT_HallUp],
-			e.Requests[floor][elevio.BT_HallDown],
-		)
+		fmt.Println("Requests:")
+		for floor := 0; floor < common.N_FLOORS; floor++ {
+			fmt.Printf("  Floor %d: [Cab: %v, Up: %v, Down: %v]\n",
+				floor,
+				e.Requests[floor][elevio.BT_Cab],
+				e.Requests[floor][elevio.BT_HallUp],
+				e.Requests[floor][elevio.BT_HallDown],
+			)
+		}
+		fmt.Println("====================================")
 	}
-	fmt.Println("====================================")
 }

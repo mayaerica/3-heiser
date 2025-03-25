@@ -81,21 +81,10 @@ func assigner(myID string) {
 				ElevGet <- ElevGetMsg{Reply: reply}
 				allElevs := <-reply
 
-				fmt.Println("\n\n\n\n\n")
-				fmt.Println(AssignedHallRequests(common.Perspective{
-					Perspective: hallRequests,
-				}))
-
-				fmt.Println("\n\n\n\n\n")
-
 				// Prepare input for HRA (only currently unassigned hall calls)
 				hraInput := hra.CreateHRAInput(allElevs, AssignedHallRequests(common.Perspective{
 					Perspective: hallRequests,
 				}))
-				fmt.Println("\n\n\n\n\n")
-				fmt.Println(hraInput)
-
-				fmt.Println("\n\n\n\n\n")
 
 				// Run HRA, the assignment optimizer
 				hraOutput := hra.HRAProcessor(hraInput)
@@ -187,9 +176,6 @@ func assigner(myID string) {
 // This helps avoid trying to reassign buttons that are already assigned.
 func AssignedHallRequests(p common.Perspective) [common.N_FLOORS][2]bool {
 	var out [common.N_FLOORS][2]bool
-	fmt.Println("output:")
-	fmt.Println(p.Perspective)
-	fmt.Println(common.Assigned)
 	for f := 0; f < common.N_FLOORS; f++ {
 		for b := 0; b < 2; b++ {
 			// Only keep track of buttons currently marked as "Assigned"
