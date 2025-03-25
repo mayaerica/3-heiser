@@ -66,7 +66,7 @@ func executionLoop(myID string) {
 				e.Requests[assigned.Floor][assigned.Button] = true
 			})
 
-			PrintElevatorState(myID) //added when debug blocking
+			//PrintElevatorState(myID) //added when debug blocking
 
 			UpdateCabLights(GetMyElevator(myID))
 
@@ -79,6 +79,7 @@ func executionLoop(myID string) {
 				})
 				elevio.SetMotorDirection(next.Dirn)
 				//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
+
 				select {
 				case StateChan <- next.Behaviour:
 				default:
@@ -95,9 +96,9 @@ func executionLoop(myID string) {
 				e.Floor = floor
 			})
 
-			PrintElevatorState(myID) //added when debug blocking
+			//PrintElevatorState(myID) //added when debug blocking
 
-			elevio.SetFloorIndicator(floor)
+			
 
 			// Decide whether we should stop and open the door
 			if RequestShouldStop(GetMyElevator(myID)) {
@@ -108,16 +109,27 @@ func executionLoop(myID string) {
 				})
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
+				DoorOpenChan <- struct{}{}
+				<-DoorCloseChan // Wait for door to fully close before moving again
+				
 
 				//why struct? its used if you don't care about
 				// sending actual data, but just want
 				// to signal something
+				fmt.Println("doorchan 2")
 				DoorOpenChan <- struct{}{}
+				fmt.Println("doorchan 2 done")
 			}
+			/*
+			if !RequestsAbove(GetMyElevator(myID)) && !RequestsHere(GetMyElevator(myID)) {
+				fmt.Println("setting IDLE \n\n\n\n\n\n")
+				StateChan <- common.IDLE
+				fmt.Println("Done setting IDLE \n\n\n\n\n\n")
+			}*/
+			PrintElevatorState(myID)
 
 		// Door closed after timeout — pick next action
 		case <-DoorCloseChan:
-			fmt.Println("Received on door close chan")
 			e := GetMyElevator(myID)
 			next := ChooseDirection(e, prevDirn)
 			WithMyElevator(myID, func(e *common.Elevator) {
@@ -138,7 +150,7 @@ func executionLoop(myID string) {
 }
 
 func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn) {
-	fmt.Printf("[BTN] Button pressed: floor=%d, type=%v\n", btn.Floor, btn.Button)
+	//fmt.Printf("[BTN] Button pressed: floor=%d, type=%v\n", btn.Floor, btn.Button)
 
 	switch btn.Button {
 	case elevio.BT_Cab:
@@ -150,7 +162,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 		backup.SaveCabRequests(GetMyElevator(myID))
 		UpdateCabLights(GetMyElevator(myID))
 
-		PrintElevatorState(myID) //added when debug blocking
+		//PrintElevatorState(myID) //added when debug blocking
 
 		// React based on current state
 		switch GetMyElevator(myID).Behaviour {
@@ -160,7 +172,9 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				fmt.Println("[DOOR_OPEN] Clearing cab request at current floor.")
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
+				fmt.Println("doorchan 1")
 				DoorOpenChan <- struct{}{}
+				fmt.Println("doorchan 1 done")
 			}
 
 		case common.IDLE:
@@ -182,7 +196,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				default:
 					fmt.Print("StateChan blocked in handleButtonPress, case dooropen")
 				}
-
 				DoorOpenChan <- struct{}{}
 
 			case common.MOVING:
@@ -236,26 +249,29 @@ func handleIdleState(myID string) {
 	next := ChooseDirection(e, e.Dirn)
 	WithMyElevator(myID, func(e *common.Elevator) {
 		e.Dirn = next.Dirn
+		e.Behaviour = next.Behaviour
 	})
 	elevio.SetMotorDirection(next.Dirn)
 	//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
-	select {
-	case StateChan <- next.Behaviour:
-	default:
-		fmt.Println("StateChan blocked in handleIdleState")
-	}
+
 }
 
 func handleMovingState(myID string) {
-	for {
 		newFloor := elevio.GetFloor()
 		if newFloor != -1 {
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = newFloor
 			})
+			e := GetMyElevator(myID)
+			
 			elevio.SetFloorIndicator(newFloor)
+			next := ChooseDirection(e, e.Dirn)
+			WithMyElevator(myID, func(e *common.Elevator) {
+				e.Dirn = next.Dirn
+				e.Behaviour = next.Behaviour
+			})
 
-			if RequestShouldStop(GetMyElevator(myID)) {
+			/*if RequestShouldStop(GetMyElevator(myID)) {
 				StopElevator()
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan // Wait for door to fully close before moving again
@@ -268,10 +284,10 @@ func handleMovingState(myID string) {
 					fmt.Println("StateChan blocked in handleMovingState")
 				}
 				return
-			}
+			}*/
 		}
 		time.Sleep(50 * time.Millisecond)
-	}
+	
 }
 
 func PrintElevatorState(myID string) {
