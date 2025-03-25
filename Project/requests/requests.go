@@ -51,14 +51,14 @@ func requestsHere(e elevator.Elevator) bool {
 }
 
 func ChooseDirection(e elevator.Elevator) DirnBehaviourPair {
-	
+
 	switch e.Dirn {
 	case elevio.MD_Up:
 		if requestsAbove(e) {
 			return DirnBehaviourPair{elevio.MD_Up, elevator.MOVING}
 		}
 		if requestsHere(e) {
-			return DirnBehaviourPair{elevio.MD_Stop ,elevator.DOOR_OPEN}
+			return DirnBehaviourPair{elevio.MD_Stop, elevator.DOOR_OPEN}
 		}
 		if requestsBelow(e) {
 			return DirnBehaviourPair{elevio.MD_Down, elevator.MOVING}
@@ -132,8 +132,8 @@ func ShouldClearImmediatley(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {  
-	//locksDone, Request and hallcall from D file 
+func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
+	//locksDone, Request and hallcall from D file
 	switch e.ClearRequestVariant {
 	case elevator.CV_All:
 		for btn := 0; btn < elevator.N_BUTTONS; btn++ {
@@ -173,7 +173,6 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator {
 
 			e.HandledBy[e.Floor][elevio.BT_HallUp] = "Done"
 			e.HandledBy[e.Floor][elevio.BT_HallDown] = "Done" //These are usually turned of if its idle, but it kinda ruins for the other elevators
-
 
 		}
 	default:

@@ -185,7 +185,11 @@ func TestPollObstructionSwitch(t *testing.T) {
 }
 
 func TestGetButton(t *testing.T) {
-	// TO DO
+	mockServer := StartMockServer("localhost:15657")
+	defer mockServer.Close()
+	time.Sleep(100 * time.Millisecond)
+	Init("localhost:15657", 4)
+	GetButton(BT_HallUp, 1)
 }
 func TestGetFloor(t *testing.T) {
 	// TO DO
