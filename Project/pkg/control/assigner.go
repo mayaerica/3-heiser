@@ -47,6 +47,7 @@ func assigner(myID string) {
 		select {
 		// Incoming messages from FSM (button press or complete)
 		case msg := <-AssignerInput:
+			fmt.Printf("[ASSIGNER] Received: %+v\n", msg) //added during blocking-debug
 			f := msg.Data.Floor
 			b := int(msg.Data.Button)
 
@@ -95,10 +96,14 @@ func assigner(myID string) {
 					for floor, buttons := range assignments {
 						for btn, assigned := range buttons {
 							if assigned {
+
+								//added under blocking-debug:
+								fmt.Printf("[ASSIGNER] Assigning floor %d button %d to %s\n", floor, btn, elevID)
+
 								hallRequests[floor][btn] = common.Assigned
 								orderID[floor][btn] = elevID
 								if elevID == myID {
-									// This assignment is for *me* → notify FSM
+									// This assignment is for 'me' → notify FSM
 									AssignedHallCallChan <- elevio.ButtonEvent{
 										Floor:  floor,
 										Button: elevio.ButtonType(btn),

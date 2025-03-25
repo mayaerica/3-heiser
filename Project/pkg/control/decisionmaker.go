@@ -12,12 +12,12 @@ import (
 // Determine whether to stop at current floor
 func RequestShouldStop(e common.Elevator) bool {
 	f := e.Floor
-	fmt.Printf("[DEBUG] RequestShouldStop: floor=%d dir=%v cab=%v up=%v down=%v\n",
+	/*fmt.Printf("[DEBUG] RequestShouldStop: floor=%d dir=%v cab=%v up=%v down=%v\n",
 		f, e.Dirn,
 		e.Requests[f][elevio.BT_Cab],
 		e.Requests[f][elevio.BT_HallUp],
 		e.Requests[f][elevio.BT_HallDown],
-	)
+	)*/
 	switch e.Dirn {
 	case elevio.MD_Down:
 		return e.Requests[f][elevio.BT_HallDown] ||

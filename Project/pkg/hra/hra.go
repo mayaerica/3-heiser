@@ -44,11 +44,17 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 	hraExecutable := ""
 	switch runtime.GOOS {
 	case "linux":
-		hraExecutable = "hall_request_assigner"
+		hraExecutable = "./pkg/hra/hall_request_assigner"
 	case "windows":
-		hraExecutable = "hall_request_assigner.exe"
+		hraExecutable = ".\\pkg\\hra\\hall_request_assigner.exe"
 	default:
 		panic("Unsupported OS")
+	}
+
+	//added under blocking-debug:
+	if _, err := exec.LookPath(hraExecutable); err !=nil{
+		fmt.Println("Could not find HRA executable:", hraExecutable)
+		return nil
 	}
 
 	jsonBytes, err := json.Marshal(currentInput)
