@@ -52,6 +52,14 @@ func main() {
 				break
 			}
 		}
+
+		//added during blocking debugging:
+		for f := 0; f < common.N_FLOORS; f++ {
+			for btn := 0; btn < common.N_BUTTONS; btn++ {
+				initial.Requests[f][btn] = false
+			}
+		}
+		fmt.Println("[BOOT] Flushed all requests at startup.")
 	}
 
 	elevio.SetFloorIndicator(initial.Floor)
@@ -71,4 +79,3 @@ func main() {
 
 	select {}
 }
-

@@ -1,5 +1,6 @@
 Before running:
-chmod +x hall_request_assigner
+chmod +x pkg/hra/hall_request_assigner
+
 
 Open multiple terminals and run:
 go run main.go -id=0 -port=15657

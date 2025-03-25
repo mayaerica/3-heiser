@@ -33,7 +33,3 @@
 │
 go.mod                    
 README.md                 
-
-
-
-elevstore: the single source of truth for the local elevator's state
