@@ -53,24 +53,34 @@ func Init(addr string, numFloors int) {
 	_initialized = true
 }
 
-func SetMotorDirection(dir Dirn) {
-	write([4]byte{1, byte(dir), 0, 0})
+func SetMotorDirection(dir Dirn) [4]byte {
+	dataToWrite := [4]byte{1, byte(dir), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
 }
 
-func SetButtonLamp(button ButtonType, floor int, value bool) {
-	write([4]byte{2, byte(button), byte(floor), ToByte(value)})
+func SetButtonLamp(button ButtonType, floor int, value bool) [4]byte {
+	dataToWrite := [4]byte{2, byte(button), byte(floor), ToByte(value)}
+	write(dataToWrite)
+	return dataToWrite
 }
 
-func SetFloorIndicator(floor int) {
-	write([4]byte{3, byte(floor), 0, 0})
+func SetFloorIndicator(floor int) [4]byte {
+	dataToWrite := [4]byte{3, byte(floor), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
 }
 
-func SetDoorOpenLamp(value bool) {
-	write([4]byte{4, ToByte(value), 0, 0})
+func SetDoorOpenLamp(value bool) [4]byte {
+	dataToWrite := [4]byte{4, ToByte(value), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
 }
 
-func SetStopLamp(value bool) {
-	write([4]byte{5, ToByte(value), 0, 0})
+func SetStopLamp(value bool) [4]byte {
+	dataToWrite := [4]byte{5, ToByte(value), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
 }
 
 func PollButtons(receiver chan<- ButtonEvent) {
@@ -155,26 +165,38 @@ func read(in [4]byte) [4]byte {
 
 	_, err := _conn.Write(in[:])
 	if err != nil {
-		panic("Lost connection to Elevator Server")
+		fmt.Println(fmt.Errorf("lost connection to Elevator Server: %v", err)) // Log error
+		return [4]byte{0, 0, 0, 0}
 	}
+	// if err != nil {
+	// 	panic("Lost connection to Elevator Server")
+	// }
 
 	var out [4]byte
 	_, err = _conn.Read(out[:])
 	if err != nil {
-		panic("Lost connection to Elevator Server")
+		fmt.Println(fmt.Errorf("lost connection to Elevator Server: %v", err)) // Log error
+		return [4]byte{0, 0, 0, 0}
 	}
+	// if err != nil {
+	// 	panic("Lost connection to Elevator Server")
+	// }
 
 	return out
 }
 
-func write(in [4]byte) {
+func write(in [4]byte) error {
 	_mtx.Lock()
 	defer _mtx.Unlock()
 
 	_, err := _conn.Write(in[:])
 	if err != nil {
-		panic("Lost connection to Elevator Server")
+		return fmt.Errorf("lost connection to Elevator Server: %w", err)
 	}
+	return nil
+	// if err != nil {
+	// 	panic("Lost connection to Elevator Server")
+	// }
 }
 
 func ToByte(a bool) byte {
