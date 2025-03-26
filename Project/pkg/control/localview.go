@@ -3,8 +3,10 @@ package control
 import (
 	"elevatorlab/common"
 	"encoding/json"
+	"sync"
 )
 
+var mu sync.Mutex
 // Global mutex for protecting ElevSet
 
 // This function safely updates *your own* elevator inside the global map.
@@ -36,6 +38,8 @@ func deepCopyElevator(e common.Elevator) common.Elevator {
 }
 
 func WithMyElevator(myID string, fn func(e *common.Elevator)) {
+	mu.Lock()
+	defer mu.Unlock()
 	ElevSet <- ElevSetMsg{
 		Fn: func(m map[string]common.Elevator) {
 			e, exists := m[myID]

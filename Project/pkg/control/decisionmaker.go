@@ -73,17 +73,15 @@ func ClearRequestsAtCurrentFloor(myID string) {
 		f := e.Floor
 		d := e.Dirn
 
-		
-
 		switch e.ClearRequestVariant {
 		case common.CV_All:
 			for btn := 0; btn < common.N_BUTTONS; btn++ {
 				e.Requests[f][btn] = false
 				if e.Requests[f][elevio.BT_HallUp] {
-					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
+					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				}
 				if e.Requests[f][elevio.BT_HallDown] {
-					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
+					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 				}
 			}
 
@@ -94,29 +92,36 @@ func ClearRequestsAtCurrentFloor(myID string) {
 			case elevio.MD_Up:
 				if !RequestsAbove(*e) {
 					e.Requests[f][elevio.BT_HallDown] = false
-					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
+					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 				}
+				fmt.Println("\n\n\nSHOULD CLEAR THIS\n\n\n")
 				e.Requests[f][elevio.BT_HallUp] = false
-				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
+				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 
 			case elevio.MD_Down:
 				if !RequestsBelow(*e) {
 					e.Requests[f][elevio.BT_HallUp] = false
-					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
+					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				}
 				e.Requests[f][elevio.BT_HallDown] = false
-				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
+				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 
 			case elevio.MD_Stop:
 				e.Requests[f][elevio.BT_HallUp] = false
-				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
+				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				e.Requests[f][elevio.BT_HallDown] = false
-				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
+				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 			}
 		}
+
+		// Print once the clearing process is completed
+		fmt.Println("\n\n\nCOMPLETE CLEARING\n\n\n\n")
+
+		// Save the elevator's updated request state
 		backup.SaveCabRequests(*e)
 	})
 }
+
 
 // Instant clear check for newly pressed button
 func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.ButtonType) bool {
