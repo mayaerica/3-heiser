@@ -13,7 +13,7 @@ var (
 	//StateChan            = make(chan common.ElevatorBehaviour, 1) // Tell the FSM to switch state (IDLE, MOVING, DOOR_OPEN)
 	DoorOpenChan         = make(chan struct{})           // Tell the door to open
 	DoorCloseChan        = make(chan struct{})           // Door has closed, resume FSM
-	AssignedHallCallChan = make(chan elevio.ButtonEvent) // Assigner tells FSM: "You're responsible for this hall call"
+	AssignedHallCallChan = make(chan elevio.ButtonEvent,10) // Assigner tells FSM: "You're responsible for this hall call"
 	OrderCompleteChan    = make(chan elevio.ButtonEvent) // FSM tells assigner: "I completed this request"
 )
 
@@ -43,7 +43,6 @@ func InitFSM(myID string, initial common.Elevator) {
 //		handleState(myID)
 //	}
 //}
-
 func StateMachineLoop(myID string) {
 	buttonPressChan := make(chan elevio.ButtonEvent)
 	floorSensorChan := make(chan int)
@@ -54,7 +53,9 @@ func StateMachineLoop(myID string) {
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	fmt.Print("Entered executionloop")
+	go PrintElevatorState(myID)
 	for {
+		
 		select {
 		// A user pressed a button (cab or hall)
 		case btn := <-buttonPressChan:
@@ -63,7 +64,7 @@ func StateMachineLoop(myID string) {
 
 		// Received a hall call assignment from the assigner
 		case assigned := <-AssignedHallCallChan:
-
+			//PrintElevatorState(myID)
 			fmt.Println("Assingment received", assigned)
 
 			WithMyElevator(myID, func(e *common.Elevator) {
@@ -72,10 +73,7 @@ func StateMachineLoop(myID string) {
 
 			// If we’re idle, start moving or open the door immediately
 			e := GetMyElevator(myID)
-			fmt.Println(e)
-			//PrintElevatorState(myID)
 			next := ChooseDirection(e, e.Dirn)
-			fmt.Println("Next:",next)
 
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
@@ -83,15 +81,8 @@ func StateMachineLoop(myID string) {
 			})
 
 			if next.Dirn == elevio.MD_Stop {
-				fmt.Println(("Assigned call is at current floor"))
-
-				ClearRequestsAtCurrentFloor(myID)
-
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
-
-				DoorOpenChan <- struct{}{}
-				<-DoorCloseChan // Wait for door to fully close before moving again
+				fmt.Println(("\n\n\n\nAssigned call is at current floor\n\n\n\n"))
+				HandleStop(GetMyElevator(myID))
 
 			} else {
 				fmt.Println(("Motor direction set"))
@@ -118,24 +109,11 @@ func StateMachineLoop(myID string) {
 				e.Floor = floor
 			})
 
+			e := GetMyElevator(myID)
 			// Decide whether we should stop and open the door
-			if RequestShouldStop(GetMyElevator(myID)) {
+			if RequestShouldStop(e) {
 				fmt.Println("Stopping at floor:", floor)
-				StopElevator()
-
-				WithMyElevator(myID, func(e *common.Elevator) {
-					e.Behaviour = common.DOOR_OPEN
-				})
-
-				ClearRequestsAtCurrentFloor(myID)
-				UpdateCabLights(GetMyElevator(myID))
-				DoorOpenChan <- struct{}{}
-				<-DoorCloseChan // Wait for door to fully close before moving again
-
-				WithMyElevator(myID, func(e *common.Elevator) {
-					e.Behaviour = common.IDLE
-				})
-
+				HandleStop(e)
 			}
 
 		// Door closed after timeout — pick next action
@@ -231,7 +209,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 	case elevio.BT_HallUp, elevio.BT_HallDown:
 		// Forward hall calls to assigner to let it decide who handles it
 		fmt.Println("[HALL] Forwarding hall request to assigner.")
-
+		fmt.Println("\n\n\n STUCK HERE \n\n\n")
 		AssignerInput <- AssignerMsg{Type: "hall_call", Data: btn}
 		AssignerInput <- AssignerMsg{Type: "assign", Data: btn}
 	}
@@ -240,6 +218,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 func PrintElevatorState(myID string) {
 
 	for {
+		time.Sleep(200*time.Millisecond)
 		e := GetMyElevator(myID)
 		time.Sleep(250 * time.Millisecond)
 		fmt.Println("========== Elevator State ==========")
@@ -257,6 +236,31 @@ func PrintElevatorState(myID string) {
 		}
 		fmt.Println("====================================")
 	}
+}
+
+func HandleStop(e common.Elevator){
+	
+	StopElevator()
+
+	WithMyElevator(e.ID, func(e *common.Elevator) {
+		e.Behaviour = common.DOOR_OPEN
+	})
+
+	ClearRequestsAtCurrentFloor(e.ID)
+	UpdateCabLights(GetMyElevator(e.ID))
+	DoorOpenChan <- struct{}{}
+	<-DoorCloseChan // Wait for door to fully close before moving again
+
+	e = GetMyElevator(e.ID)
+	next := ChooseDirection(e, e.Dirn)
+	WithMyElevator(e.ID, func(e *common.Elevator) {
+		e.Behaviour = next.Behaviour
+		e.Dirn = next.Dirn
+	})
+
+	elevio.SetMotorDirection(next.Dirn)
+
+
 }
 
 /* Reaction when StesteChan is updated
