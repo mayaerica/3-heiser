@@ -53,7 +53,7 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3000 * time.Millisecond,
+		DoorOpenDuration:    500 * time.Millisecond,
 	}
 	fmt.Println(2)
 
@@ -86,14 +86,7 @@ func main() {
 	go control.RunElevState(myID, initial, 16570) //wrong port?
 	control.InitFSM(myID, initial)
 	control.InitAssigner(myID)
-	go func() {
-		for btn := range control.OrderCompleteChan {
-			control.AssignerInput <- control.AssignerMsg{
-				Type: "complete",
-				Data: btn,
-			}
-		}
-	}()
+	
 
 	select {}
 }

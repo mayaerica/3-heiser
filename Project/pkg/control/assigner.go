@@ -60,11 +60,13 @@ func assigner(myID string) {
 				UpdateHallLightsFromPerspective(hallRequests)
 
 			case "complete":
+				fmt.Println("complete!!!")
 				// A hall call was served. Depending on peer count, we either mark it gone or unknown
 				if len(peerList.Peers) > 1 {
 					// If we're in a network, clear it
 					hallRequests[f][b] = common.NotRequested
 					if orderID[f][b] == myID {
+						time.Sleep(5*time.Second)
 						orderID[f][b] = "Done"
 					}
 				} else {
@@ -81,12 +83,17 @@ func assigner(myID string) {
 
 				// Get the current global view of elevators
 				hallRequests, orderID = assignHallRequest(myID, hallRequests, orderID)
+				UpdateHallLightsFromPerspective(hallRequests)
 			}
 
 		// Another elevator sent us their current view
 		case theirs := <-perspectiveRx:
 			// Store their view
-		//	fmt.Println("Got perspective",theirs," from:",theirs.ID)
+			
+			if theirs.ID == myID {
+				break
+			}
+			
 			perspectiveMap[theirs.ID] = theirs
 
 			// Reconcile their view with ours, button-by-button
@@ -125,6 +132,10 @@ func assigner(myID string) {
 			}
 		UpdateHallLightsFromPerspective(hallRequests)
 		// If a peer disappears, we forget what they thought (temp)
+
+
+			
+
 		case peerList := <-peerUpdateChan:
 			for _, lost := range peerList.Lost {
 				delete(perspectiveMap, lost)
@@ -168,7 +179,7 @@ func assignHallRequest(myID string, hallRequests [common.N_FLOORS][2]common.Orde
 								//added under blocking-debug:
 					fmt.Printf("[ASSIGNER] Assigning floor %d button %d to %s\n", floor, btn, elevID)
 
-					hallRequests[floor][btn] = common.Unassigned
+					hallRequests[floor][btn] = common.Assigned
 					orderID[floor][btn] = elevID
 					if elevID == myID {
 									// This assignment is for 'me' → notify FSM

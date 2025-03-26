@@ -80,10 +80,10 @@ func ClearRequestsAtCurrentFloor(myID string) {
 			for btn := 0; btn < common.N_BUTTONS; btn++ {
 				e.Requests[f][btn] = false
 				if e.Requests[f][elevio.BT_HallUp] {
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				}
 				if e.Requests[f][elevio.BT_HallDown] {
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 				}
 			}
 
@@ -94,24 +94,24 @@ func ClearRequestsAtCurrentFloor(myID string) {
 			case elevio.MD_Up:
 				if !RequestsAbove(*e) {
 					e.Requests[f][elevio.BT_HallDown] = false
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 				}
 				e.Requests[f][elevio.BT_HallUp] = false
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 
 			case elevio.MD_Down:
 				if !RequestsBelow(*e) {
 					e.Requests[f][elevio.BT_HallUp] = false
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+					AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				}
 				e.Requests[f][elevio.BT_HallDown] = false
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 
 			case elevio.MD_Stop:
 				e.Requests[f][elevio.BT_HallUp] = false
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 				e.Requests[f][elevio.BT_HallDown] = false
-				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+				AssignerInput <- AssignerMsg {Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 			}
 		}
 		backup.SaveCabRequests(*e)

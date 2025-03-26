@@ -5,7 +5,6 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/backup"
 	"fmt"
-	"time"
 )
 
 // Channels used in the FSM system
@@ -59,6 +58,7 @@ func StateMachineLoop(myID string) {
 		select {
 		// A user pressed a button (cab or hall)
 		case btn := <-buttonPressChan:
+			PrintElevatorState(myID)
 			fmt.Println("Buttonpress received", btn)
 			handleButtonPress(myID, btn, &prevDirn)
 
@@ -71,25 +71,26 @@ func StateMachineLoop(myID string) {
 				e.Requests[assigned.Floor][assigned.Button] = true
 			})
 
-			// If we’re idle, start moving or open the door immediately
 			e := GetMyElevator(myID)
-			next := ChooseDirection(e, e.Dirn)
+			if e.Behaviour != common.DOOR_OPEN{
+				// If we’re idle, start moving or open the door immediately
+				
+				next := ChooseDirection(e, e.Dirn)
 
-			WithMyElevator(myID, func(e *common.Elevator) {
-				e.Dirn = next.Dirn
-				e.Behaviour = next.Behaviour
-			})
+				WithMyElevator(myID, func(e *common.Elevator) {
+					e.Dirn = next.Dirn
+					e.Behaviour = next.Behaviour
+				})
 
-			if next.Dirn == elevio.MD_Stop {
-				fmt.Println(("\n\n\n\nAssigned call is at current floor\n\n\n\n"))
-				HandleStop(GetMyElevator(myID))
+				if next.Dirn == elevio.MD_Stop {
+					HandleStop(GetMyElevator(myID))
 
-			} else {
-				fmt.Println(("Motor direction set"))
-				if next.Behaviour != common.DOOR_OPEN{
+				} else {
+					fmt.Println(("Motor direction set"))
 					elevio.SetMotorDirection(next.Dirn) //HER ER PROBLEMET 1
+					
+					prevDirn = next.Dirn
 				}
-				prevDirn = next.Dirn
 			}
 			/*select {
 			case StateChan <- next.Behaviour:
@@ -121,6 +122,7 @@ func StateMachineLoop(myID string) {
 
 		// Door closed after timeout — pick next action
 		case <-DoorCloseChan:
+			PrintElevatorState(myID)
 			fmt.Println("Door closed, choosing next action...")
 			e := GetMyElevator(myID)
 			next := ChooseDirection(e, prevDirn)
@@ -163,7 +165,8 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				fmt.Println("[DOOR_OPEN] Clearing cab request at current floor.")
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
-				DoorOpenChan <- struct{}{}
+
+				openDoor(myID)
 			}
 
 		case common.IDLE:
@@ -179,7 +182,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				fmt.Println("[IDLE] Opening door immediately at current floor.")
 				ClearRequestsAtCurrentFloor(myID)
 				UpdateCabLights(GetMyElevator(myID))
-				DoorOpenChan <- struct{}{}
+				openDoor(myID)
 
 				//elevio.SetDoorOpenLamp(true)
 				//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
@@ -213,7 +216,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 	case elevio.BT_HallUp, elevio.BT_HallDown:
 		// Forward hall calls to assigner to let it decide who handles it
 		fmt.Println("[HALL] Forwarding hall request to assigner.")
-		fmt.Println("\n\n\n STUCK HERE \n\n\n")
 		AssignerInput <- AssignerMsg{Type: "hall_call", Data: btn}
 		AssignerInput <- AssignerMsg{Type: "assign", Data: btn}
 	}
@@ -222,7 +224,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 func PrintElevatorState(myID string) {
 
 		e := GetMyElevator(myID)
-		time.Sleep(50 * time.Millisecond)
 		fmt.Println("========== Elevator State ==========")
 		fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
 			e.ID, e.Floor, e.Dirn, e.Behaviour)
@@ -243,17 +244,22 @@ func PrintElevatorState(myID string) {
 func HandleStop(e common.Elevator){
 	StopElevator()
 
-	WithMyElevator(e.ID, func(e *common.Elevator) {
-		e.Behaviour = common.DOOR_OPEN
-	})
-
 	ClearRequestsAtCurrentFloor(e.ID)
 	UpdateCabLights(GetMyElevator(e.ID))
-	DoorOpenChan <- struct{}{}
+	openDoor(e.ID)
 	//<-DoorCloseChan // Wait for door to fully close before moving again
 
 
 }
+
+
+func openDoor(myID string) {
+	WithMyElevator(myID, func(e *common.Elevator) {
+		e.Behaviour = common.DOOR_OPEN
+	})
+	DoorOpenChan <- struct{}{}
+}
+
 
 /* Reaction when StesteChan is updated
 func handleState(myID string) {
