@@ -53,7 +53,7 @@ func StateMachineLoop(myID string) {
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	fmt.Print("Entered executionloop")
-	go PrintElevatorState(myID)
+	//go PrintElevatorState(myID)
 	for {
 		
 		select {
@@ -86,7 +86,9 @@ func StateMachineLoop(myID string) {
 
 			} else {
 				fmt.Println(("Motor direction set"))
-				elevio.SetMotorDirection(next.Dirn)
+				if next.Behaviour != common.DOOR_OPEN{
+					elevio.SetMotorDirection(next.Dirn) //HER ER PROBLEMET 1
+				}
 				prevDirn = next.Dirn
 			}
 			/*select {
@@ -111,6 +113,7 @@ func StateMachineLoop(myID string) {
 
 			e := GetMyElevator(myID)
 			// Decide whether we should stop and open the door
+			fmt.Println("should stop here \n\n\n\n\n\n")
 			if RequestShouldStop(e) {
 				fmt.Println("Stopping at floor:", floor)
 				HandleStop(e)
@@ -165,7 +168,8 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 
 		case common.IDLE:
 			// Start elevator activity immediately
-			pair := ChooseDirection(GetMyElevator(myID), *prevDirn)
+			e := GetMyElevator(myID)
+			pair := ChooseDirection(e,e.Dirn)
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = pair.Dirn
 				e.Behaviour = pair.Behaviour
@@ -217,10 +221,8 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 
 func PrintElevatorState(myID string) {
 
-	for {
-		time.Sleep(200*time.Millisecond)
 		e := GetMyElevator(myID)
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		fmt.Println("========== Elevator State ==========")
 		fmt.Printf("ID: %s | Floor: %d | Direction: %v | Behaviour: %v\n",
 			e.ID, e.Floor, e.Dirn, e.Behaviour)
@@ -236,10 +238,9 @@ func PrintElevatorState(myID string) {
 		}
 		fmt.Println("====================================")
 	}
-}
+
 
 func HandleStop(e common.Elevator){
-	
 	StopElevator()
 
 	WithMyElevator(e.ID, func(e *common.Elevator) {
@@ -249,16 +250,7 @@ func HandleStop(e common.Elevator){
 	ClearRequestsAtCurrentFloor(e.ID)
 	UpdateCabLights(GetMyElevator(e.ID))
 	DoorOpenChan <- struct{}{}
-	<-DoorCloseChan // Wait for door to fully close before moving again
-
-	e = GetMyElevator(e.ID)
-	next := ChooseDirection(e, e.Dirn)
-	WithMyElevator(e.ID, func(e *common.Elevator) {
-		e.Behaviour = next.Behaviour
-		e.Dirn = next.Dirn
-	})
-
-	elevio.SetMotorDirection(next.Dirn)
+	//<-DoorCloseChan // Wait for door to fully close before moving again
 
 
 }

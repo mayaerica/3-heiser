@@ -47,7 +47,7 @@ func assigner(myID string) {
 		select {
 		// Incoming messages from FSM (button press or complete)
 		case msg := <-AssignerInput:
-			fmt.Printf("[ASSIGNER] Received: %+v\n", msg) //added during blocking-debug
+			fmt.Printf("[ASSIGNER5] Received: %+v\n", msg) //added during blocking-debug
 			f := msg.Data.Floor
 			b := int(msg.Data.Button)
 
@@ -64,6 +64,9 @@ func assigner(myID string) {
 				if len(peerList.Peers) > 1 {
 					// If we're in a network, clear it
 					hallRequests[f][b] = common.NotRequested
+					if orderID[f][b] == myID {
+						orderID[f][b] = "Done"
+					}
 				} else {
 					// If alone, keep it as "unknown" (we don't trust we're really done)
 					hallRequests[f][b] = common.Unknown
@@ -77,49 +80,13 @@ func assigner(myID string) {
 				}
 
 				// Get the current global view of elevators
-				reply := make(chan map[string]common.Elevator)
-				ElevGet <- ElevGetMsg{Reply: reply}
-				allElevs := <-reply
-
-				// Prepare input for HRA (only currently unassigned hall calls)
-				hraInput := hra.CreateHRAInput(allElevs, AssignedHallRequests(common.Perspective{
-					Perspective: hallRequests,
-				}))
-
-				// Run HRA, the assignment optimizer
-				hraOutput := hra.HRAProcessor(hraInput)
-				if hraOutput == nil {
-					fmt.Println("[HRA] error: assignment failed")
-					break
-				}
-
-				// Apply the results from HRA
-				for elevID, assignments := range *hraOutput {
-					for floor, buttons := range assignments {
-						for btn, assigned := range buttons {
-							if assigned {
-
-								//added under blocking-debug:
-								fmt.Printf("[ASSIGNER] Assigning floor %d button %d to %s\n", floor, btn, elevID)
-
-								hallRequests[floor][btn] = common.Assigned
-								orderID[floor][btn] = elevID
-								if elevID == myID {
-									// This assignment is for 'me' → notify FSM
-									AssignedHallCallChan <- elevio.ButtonEvent{
-										Floor:  floor,
-										Button: elevio.ButtonType(btn),
-									}
-								}
-							}
-						}
-					}
-				}
+				hallRequests, orderID = assignHallRequest(myID, hallRequests, orderID)
 			}
 
 		// Another elevator sent us their current view
 		case theirs := <-perspectiveRx:
 			// Store their view
+		//	fmt.Println("Got perspective",theirs," from:",theirs.ID)
 			perspectiveMap[theirs.ID] = theirs
 
 			// Reconcile their view with ours, button-by-button
@@ -135,11 +102,15 @@ func assigner(myID string) {
 						// If they say unassigned, and we don't know about it — mark it unassigned
 						if hallRequests[f][b] == common.NotRequested || hallRequests[f][b] == common.Unknown {
 							hallRequests[f][b] = common.Unassigned
+							hallRequests, orderID = assignHallRequest(myID, hallRequests, orderID)
+
 						}
 					case common.Assigned:
 						// Only mark it assigned if all peers agree it's assigned to me
 						if EveryoneAgreesAssignedToMe(perspectiveMap, myID, f, b) {
 							hallRequests[f][b] = common.Assigned
+							
+
 						}
 					case common.Unknown:
 						//  Another elevator says: "I don't know the state of this hall call."
@@ -152,8 +123,9 @@ func assigner(myID string) {
 					}
 				}
 			}
+		UpdateHallLightsFromPerspective(hallRequests)
 		// If a peer disappears, we forget what they thought (temp)
-		case peerList = <-peerUpdateChan:
+		case peerList := <-peerUpdateChan:
 			for _, lost := range peerList.Lost {
 				delete(perspectiveMap, lost)
 			}
@@ -168,6 +140,52 @@ func assigner(myID string) {
 		}
 	}
 }
+
+
+func assignHallRequest(myID string, hallRequests [common.N_FLOORS][2]common.OrderState, orderID [common.N_FLOORS][2]string) ([common.N_FLOORS][2]common.OrderState, [common.N_FLOORS][2]string) {
+	reply := make(chan map[string]common.Elevator)
+	ElevGet <- ElevGetMsg{Reply: reply}
+	allElevs := <-reply
+
+				// Prepare input for HRA (only currently unassigned hall calls)
+	hraInput := hra.CreateHRAInput(allElevs, AssignedHallRequests(common.Perspective{
+		Perspective: hallRequests,
+	}))
+
+				// Run HRA, the assignment optimizer
+	hraOutput := hra.HRAProcessor(hraInput)
+	if hraOutput == nil {
+		fmt.Println("[HRA] error: assignment failed")
+		return [common.N_FLOORS][2]common.OrderState{}, [common.N_FLOORS][2]string{}
+	}
+
+				// Apply the results from HRA
+	for elevID, assignments := range *hraOutput {
+		for floor, buttons := range assignments {
+			for btn, assigned := range buttons {
+				if assigned {
+
+								//added under blocking-debug:
+					fmt.Printf("[ASSIGNER] Assigning floor %d button %d to %s\n", floor, btn, elevID)
+
+					hallRequests[floor][btn] = common.Unassigned
+					orderID[floor][btn] = elevID
+					if elevID == myID {
+									// This assignment is for 'me' → notify FSM
+						AssignedHallCallChan <- elevio.ButtonEvent{
+							Floor:  floor,
+							Button: elevio.ButtonType(btn),
+						}
+					}
+				}
+			}
+		}
+	}
+	return hallRequests,orderID
+}
+
+
+
 
 // AssignedHallRequests extracts only the currently assigned hall requests
 // from a full Perspective. It's used when feeding input into the HRA,

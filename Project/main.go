@@ -5,6 +5,7 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/control"
 	"elevatorlab/pkg/network/localip"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -12,27 +13,39 @@ import (
 
 func main() {
 	var myID string
+	var port string
 
-	if len(os.Args) < 2 {
-		fmt.Println("usage: go run main.go [elevatorID] OR --auto")
+	// Define the command-line flags
+	flag.StringVar(&myID, "id", "", "Elevator ID to use")
+	flag.StringVar(&port, "port", "15657", "Port to use for the elevator (default is 15657)")
+	flag.Parse()
+
+	// Check if the elevator ID is specified, if not we show the usage
+	if myID == "" && len(flag.Args()) < 1 {
+		fmt.Println("usage: go run main.go -id=[elevatorID] OR --auto")
 		return
 	}
 
-	if os.Args[1] == "--auto" {
+	// If --auto is provided, generate ID automatically
+	if myID == "" && flag.Args()[0] == "--auto" {
 		ip, err := localip.LocalIP()
 		if err != nil {
 			fmt.Println("Could not get local IP:", err)
 			return
 		}
-		myID = ip
-		//myID = fmt.Sprintf("%s-%d", ip, os.Getpid()) //when running multiple elevators on the same machine
-	} else {
-		myID = os.Args[1]
+		myID = fmt.Sprintf("%s-%d", ip, os.Getpid()) //when running multiple elevators on the same machine
+		fmt.Println("Auto-generated ID:", myID)
+	} else if myID == "" {
+		// If no ID is given, print usage
+		fmt.Println("usage: go run main.go -id=[elevatorID] OR --auto")
+		return
 	}
 
+	// Print the elevator starting info
 	fmt.Printf("Elevator starting with ID: %s\n", myID)
 
-	elevio.Init("localhost:15657", elevio.N_FLOORS)
+	// Initialize the elevator I/O
+	elevio.Init(fmt.Sprintf("localhost:%s", port), elevio.N_FLOORS)
 
 	initial := common.Elevator{
 		ID:                  myID,
@@ -40,8 +53,9 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    500 * time.Millisecond,
+		DoorOpenDuration:    3000 * time.Millisecond,
 	}
+	fmt.Println(2)
 
 	if initial.Floor == -1 {
 		fmt.Println("Starting between floors. Moving down to find floor...")
@@ -63,11 +77,10 @@ func main() {
 		}
 		fmt.Println("[BOOT] Flushed all requests at startup.")
 		elevio.SetFloorIndicator(initial.Floor)
-
 	}
 
-	var initalHallRequests [common.N_FLOORS][2]common.OrderState
-	control.UpdateAllLights(initial, initalHallRequests)
+	var emptyHallRequests [common.N_FLOORS][2]common.OrderState
+	control.UpdateAllLights(initial, emptyHallRequests)
 
 	initial.ClearRequestVariant = common.CV_InDirn
 	go control.RunElevState(myID, initial, 16570) //wrong port?
