@@ -40,7 +40,7 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3 * time.Second,
+		DoorOpenDuration:    500 * time.Millisecond,
 	}
 
 	if initial.Floor == -1 {

@@ -72,7 +72,10 @@ func StateMachineLoop(myID string) {
 
 			// If we’re idle, start moving or open the door immediately
 			e := GetMyElevator(myID)
+			fmt.Println(e)
+			//PrintElevatorState(myID)
 			next := ChooseDirection(e, e.Dirn)
+			fmt.Println("Next:",next)
 
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
