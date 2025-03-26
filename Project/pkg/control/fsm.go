@@ -13,7 +13,7 @@ var (
 	//StateChan            = make(chan common.ElevatorBehaviour, 1) // Tell the FSM to switch state (IDLE, MOVING, DOOR_OPEN)
 	DoorOpenChan         = make(chan struct{})           // Tell the door to open
 	DoorCloseChan        = make(chan struct{})           // Door has closed, resume FSM
-	AssignedHallCallChan = make(chan elevio.ButtonEvent,100) // Assigner tells FSM: "You're responsible for this hall call"
+	AssignedHallCallChan = make(chan elevio.ButtonEvent) // Assigner tells FSM: "You're responsible for this hall call"
 	OrderCompleteChan    = make(chan elevio.ButtonEvent) // FSM tells assigner: "I completed this request"
 )
 
@@ -30,7 +30,6 @@ func InitFSM(myID string, initial common.Elevator) {
 	//go StateMachineLoop(myID)                                         // Controls what to do in each state
 	go StateMachineLoop(myID)                                         // Reacts to events: buttons, floor sensor, assignments
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration) // Door opens and closes
-	//go PrintElevatorState(myID)
 }
 
 //func StateMachineLoop(myID string) {
@@ -53,7 +52,6 @@ func StateMachineLoop(myID string) {
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	fmt.Print("Entered executionloop")
-	//go PrintElevatorState(myID)
 	for {
 		
 		select {
@@ -68,7 +66,6 @@ func StateMachineLoop(myID string) {
 				e.Requests[assigned.Floor][assigned.Button] = true
 			})
 			e:=GetMyElevator(myID)
-			PrintElevatorState(myID)
 			button := assigned.Button
 			floor := assigned.Floor
 			switch e.Behaviour {
@@ -154,8 +151,6 @@ func StateMachineLoop(myID string) {
 				e.Dirn = next.Dirn
 				e.Behaviour = next.Behaviour
 			})
-
-			PrintElevatorState(myID)
 
 			if next.Behaviour == common.MOVING{
 				elevio.SetMotorDirection(next.Dirn) //HER ER PROBLEMET 1
@@ -268,10 +263,7 @@ func PrintElevatorState(myID string) {
 
 func HandleStop(e common.Elevator, myID string){
 	StopElevator()
-
-	fmt.Println("Before clear \n\n",e)
 	ClearRequestsAtCurrentFloor(e.ID)
-	fmt.Println("AFter clear\n\n",e)
 	UpdateCabLights(GetMyElevator(e.ID))
 	openDoor(myID)
 	//<-DoorCloseChan // Wait for door to fully close before moving again
