@@ -64,54 +64,85 @@ func StateMachineLoop(myID string) {
 
 		// Received a hall call assignment from the assigner
 		case assigned := <-AssignedHallCallChan:
-			//PrintElevatorState(myID)
-			fmt.Println("Assingment received", assigned)
-
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Requests[assigned.Floor][assigned.Button] = true
 			})
-
-			// If we’re idle, start moving or open the door immediately
-			e := GetMyElevator(myID)
-			next := ChooseDirection(e, e.Dirn)
-
-			WithMyElevator(myID, func(e *common.Elevator) {
-				e.Dirn = next.Dirn
-				e.Behaviour = next.Behaviour
-			})
-
-			if next.Dirn == elevio.MD_Stop {
-				fmt.Println(("\n\n\n\nAssigned call is at current floor\n\n\n\n"))
-				HandleStop(GetMyElevator(myID), myID)
-
-			} else {
-				fmt.Println(("Motor direction set"))
-				if next.Behaviour != common.DOOR_OPEN{
-					elevio.SetMotorDirection(next.Dirn) //HER ER PROBLEMET 1
+			e:=GetMyElevator(myID)
+			PrintElevatorState(myID)
+			button := assigned.Button
+			floor := assigned.Floor
+			switch e.Behaviour {
+				
+				
+			case common.DOOR_OPEN:
+				// If we're at the same floor and it's clearable, refresh door timer
+				if elevio.GetFloor() == floor && ShouldClearImmediately(GetMyElevator(myID), floor, button) {
+					fmt.Println("[DOOR_OPEN] Clearing hall request at current floor.")
+					ClearRequestsAtCurrentFloor(myID)
+					UpdateCabLights(GetMyElevator(myID))
+	
+					openDoor(myID)
 				}
-				prevDirn = next.Dirn
-			}
-			/*select {
-			case StateChan <- next.Behaviour:
-			default:
-				fmt.Println("StateChan blocked in executionLoop (assigned)")
+	
+			case common.IDLE:
+				// Start elevator activity immediately
+				next := ChooseDirection(e,e.Dirn)
+				WithMyElevator(myID, func(e *common.Elevator) {
+					e.Dirn = next.Dirn
+					e.Behaviour = next.Behaviour
+				})
+				switch next.Behaviour {
+				case common.DOOR_OPEN:
+					fmt.Println("[IDLE] Opening door immediately at current floor.")
+					ClearRequestsAtCurrentFloor(myID)
+					UpdateCabLights(GetMyElevator(myID))
+					openDoor(myID)
+	
+					//elevio.SetDoorOpenLamp(true)
+					//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
+					//select {
+					//case StateChan <- common.DOOR_OPEN:
+					//default:
+					//	fmt.Print("StateChan blocked in handleButtonPress, case dooropen")
+					//}
+	
+				case common.MOVING:
+					fmt.Println("[IDLE] Starting to move.")
+					elevio.SetMotorDirection(next.Dirn) 
+					
+	
+					//select {
+					//case StateChan <- common.DOOR_OPEN:
+					//default:
+					//	fmt.Print("StateChan blocked in handleButtonPress, case moving")
+					//}
+	
+				case common.IDLE:
+					fmt.Println("[IDLE] No direction chosen. Staying idle.")
+	
+					/*case StateChan <- common.IDLE:
+					default:
+						fmt.Print("StateChan blocked in handleButtonPress, case idle")
+					}*/
+				}
 			}
 
-			if next.Dirn != elevio.MD_Stop {
-				prevDirn = next.Dirn
-			}*/
-			//}
 
-		//Elevator arrived at a new floor
+
 		case floor := <-floorSensorChan:
 			fmt.Println("Floor sensor has been activated")
 			elevio.SetFloorIndicator(floor)
+			e := GetMyElevator(myID)
+			e.Floor = floor
+			next := ChooseDirection(e, e.Dirn)
 
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = floor
+				e.Behaviour = next.Behaviour
+				e.Dirn = next.Dirn
 			})
 
-			e := GetMyElevator(myID)
+			
 			// Decide whether we should stop and open the door
 			fmt.Println("should stop here \n\n\n\n\n\n")
 			if RequestShouldStop(e) {
@@ -129,7 +160,9 @@ func StateMachineLoop(myID string) {
 				e.Behaviour = next.Behaviour
 			})
 
-			elevio.SetMotorDirection(next.Dirn)
+			if next.Behaviour != common.DOOR_OPEN{
+				elevio.SetMotorDirection(next.Dirn) //HER ER PROBLEMET 1
+			}
 
 			//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 			/*select {
@@ -192,8 +225,8 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 
 			case common.MOVING:
 				fmt.Println("[IDLE] Starting to move.")
-				elevio.SetMotorDirection(pair.Dirn)
-				*prevDirn = pair.Dirn
+				elevio.SetMotorDirection(pair.Dirn) 
+				
 
 				//select {
 				//case StateChan <- common.DOOR_OPEN:
