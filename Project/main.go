@@ -7,6 +7,7 @@ import (
 	"elevatorlab/pkg/network/localip"
 	"fmt"
 	"os"
+	"time"
 )
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3,
+		DoorOpenDuration:    500*time.Millisecond,
 	}
 
 	if initial.Floor == -1 {
@@ -60,10 +61,15 @@ func main() {
 			}
 		}
 		fmt.Println("[BOOT] Flushed all requests at startup.")
+		elevio.SetFloorIndicator(initial.Floor)
+		
 	}
 
-	elevio.SetFloorIndicator(initial.Floor)
+	var initalHallRequests [common.N_FLOORS][2]common.OrderState
+	control.UpdateAllLights(initial,initalHallRequests)
+	
 
+	initial.ClearRequestVariant=common.CV_InDirn
 	go control.RunElevState(myID, initial, 16570)
 	control.InitFSM(myID, initial)
 	control.InitAssigner(myID)

@@ -27,7 +27,7 @@ func CreateHRAInput(states map[string]common.Elevator, hall [common.N_FLOORS][2]
 		HallRequests: hall,
 		States:       make(map[string]HRAElevState),
 	}
-
+	
 	for id, elev := range states {
 		out.States[id] = HRAElevState{
 			Behaviour:   utils.BehaviourToString(elev.Behaviour),
@@ -77,7 +77,7 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 		fmt.Println("json.Unmarshal error:", err)
 		return nil
 	}
-
+	fmt.Println(currentInput)
 	fmt.Printf("HRAoutput:\n")
 	for k, v := range *output {
 		fmt.Printf("  %6v  %+v\n", k, v)

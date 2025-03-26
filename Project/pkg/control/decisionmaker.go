@@ -73,17 +73,18 @@ func ClearRequestsAtCurrentFloor(myID string) {
 		f := e.Floor
 		d := e.Dirn
 
-		if e.Requests[f][elevio.BT_HallUp] {
-			OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
-		}
-		if e.Requests[f][elevio.BT_HallDown] {
-			OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
-		}
+		
 
 		switch e.ClearRequestVariant {
 		case common.CV_All:
 			for btn := 0; btn < common.N_BUTTONS; btn++ {
 				e.Requests[f][btn] = false
+				if e.Requests[f][elevio.BT_HallUp] {
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
+				}
+				if e.Requests[f][elevio.BT_HallDown] {
+					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
+				}
 			}
 
 		case common.CV_InDirn:
@@ -91,6 +92,7 @@ func ClearRequestsAtCurrentFloor(myID string) {
 
 			switch d {
 			case elevio.MD_Up:
+				fmt.Println("\n\n\n\nclearing up\n\n\n\n")
 				if !RequestsAbove(*e) {
 					e.Requests[f][elevio.BT_HallDown] = false
 					OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
@@ -107,6 +109,7 @@ func ClearRequestsAtCurrentFloor(myID string) {
 				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}
 
 			case elevio.MD_Stop:
+				fmt.Println("\n\n\n\nSTOP\n\n\n\n")
 				e.Requests[f][elevio.BT_HallUp] = false
 				OrderCompleteChan <- elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}
 				e.Requests[f][elevio.BT_HallDown] = false
@@ -138,10 +141,11 @@ func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.Butt
 
 // Choose next direction + behaviour
 func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehaviourPair {
-	fmt.Printf("[DEBUG] ChooseDirection: floor=%d, prevDirn=%v\n", e.Floor, prevDirn)
-	fmt.Println("RequestsHere:", RequestsHere(e))
-	fmt.Println("RequestsAbove:", RequestsAbove(e))
-	fmt.Println("RequestsBelow:", RequestsBelow(e))
+	//fmt.Printf("[DEBUG] ChooseDirection: floor=%d, prevDirn=%v\n", e.Floor, prevDirn)
+	//fmt.Println("RequestsHere:", RequestsHere(e))
+	//fmt.Println("RequestsAbove:", RequestsAbove(e))
+	//fmt.Println("RequestsBelow:", RequestsBelow(e))
+	fmt.Print()
 
 	switch prevDirn {
 	case elevio.MD_Up:
@@ -152,6 +156,7 @@ func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehavio
 		} else if RequestsBelow(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
 		}
+		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 	case elevio.MD_Down:
 		if RequestsBelow(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
@@ -160,7 +165,9 @@ func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehavio
 		} else if RequestsAbove(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Up, Behaviour: common.MOVING}
 		}
+		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 	case elevio.MD_Stop:
+		fmt.Println("MD_STOP HERE YEYE")
 		if RequestsHere(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.DOOR_OPEN}
 		} else if RequestsAbove(e) {
@@ -168,6 +175,8 @@ func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehavio
 		} else if RequestsBelow(e) {
 			return common.DirnBehaviourPair{Dirn: elevio.MD_Down, Behaviour: common.MOVING}
 		}
+		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
+	default:
+		return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 	}
-	return common.DirnBehaviourPair{Dirn: elevio.MD_Stop, Behaviour: common.IDLE}
 }

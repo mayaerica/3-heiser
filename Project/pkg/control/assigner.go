@@ -57,6 +57,7 @@ func assigner(myID string) {
 				if hallRequests[f][b] == common.NotRequested || hallRequests[f][b] == common.Unknown {
 					hallRequests[f][b] = common.Unassigned
 				}
+				UpdateHallLightsFromPerspective(hallRequests)
 
 			case "complete":
 				// A hall call was served. Depending on peer count, we either mark it gone or unknown
@@ -67,6 +68,7 @@ func assigner(myID string) {
 					// If alone, keep it as "unknown" (we don't trust we're really done)
 					hallRequests[f][b] = common.Unknown
 				}
+				UpdateHallLightsFromPerspective(hallRequests)
 
 			// We are asked to try assigning all unassigned calls
 			case "assign":
@@ -177,7 +179,7 @@ func AssignedHallRequests(p common.Perspective) [common.N_FLOORS][2]bool {
 	for f := 0; f < common.N_FLOORS; f++ {
 		for b := 0; b < 2; b++ {
 			// Only keep track of buttons currently marked as "Assigned"
-			out[f][b] = p.Perspective[f][b] == common.Assigned
+			out[f][b] = p.Perspective[f][b] == common.Assigned || p.Perspective[f][b] == common.Unassigned 
 		}
 	}
 	return out
