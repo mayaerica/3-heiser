@@ -40,7 +40,7 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    3*time.Second,
+		DoorOpenDuration:    3 * time.Second,
 	}
 
 	if initial.Floor == -1 {
@@ -63,18 +63,16 @@ func main() {
 		}
 		fmt.Println("[BOOT] Flushed all requests at startup.")
 		elevio.SetFloorIndicator(initial.Floor)
-		
+
 	}
 
 	var initalHallRequests [common.N_FLOORS][2]common.OrderState
-	control.UpdateAllLights(initial,initalHallRequests)
-	
+	control.UpdateAllLights(initial, initalHallRequests)
 
-	initial.ClearRequestVariant=common.CV_InDirn
-	go control.RunElevState(myID, initial, 16570)
+	initial.ClearRequestVariant = common.CV_InDirn
+	go control.RunElevState(myID, initial, 16570) //wrong port?
 	control.InitFSM(myID, initial)
 	control.InitAssigner(myID)
-
 	go func() {
 		for btn := range control.OrderCompleteChan {
 			control.AssignerInput <- control.AssignerMsg{

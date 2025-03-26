@@ -11,10 +11,10 @@ import (
 // Channels used in the FSM system
 var (
 	//StateChan            = make(chan common.ElevatorBehaviour, 1) // Tell the FSM to switch state (IDLE, MOVING, DOOR_OPEN)
-	DoorOpenChan         = make(chan struct{})                    // Tell the door to open
-	DoorCloseChan        = make(chan struct{})                    // Door has closed, resume FSM
-	AssignedHallCallChan = make(chan elevio.ButtonEvent)          // Assigner tells FSM: "You're responsible for this hall call"
-	OrderCompleteChan    = make(chan elevio.ButtonEvent)          // FSM tells assigner: "I completed this request"
+	DoorOpenChan         = make(chan struct{})           // Tell the door to open
+	DoorCloseChan        = make(chan struct{})           // Door has closed, resume FSM
+	AssignedHallCallChan = make(chan elevio.ButtonEvent) // Assigner tells FSM: "You're responsible for this hall call"
+	OrderCompleteChan    = make(chan elevio.ButtonEvent) // FSM tells assigner: "I completed this request"
 )
 
 func InitFSM(myID string, initial common.Elevator) {
@@ -28,18 +28,18 @@ func InitFSM(myID string, initial common.Elevator) {
 
 	// Start FSM components
 	//go StateMachineLoop(myID)                                         // Controls what to do in each state
-	go StateMachineLoop(myID)                                            // Reacts to events: buttons, floor sensor, assignments
+	go StateMachineLoop(myID)                                         // Reacts to events: buttons, floor sensor, assignments
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration) // Door opens and closes
-	go PrintElevatorState(myID)
+	//go PrintElevatorState(myID)
 }
 
 //func StateMachineLoop(myID string) {
 //	for state := range StateChan {
-		// Update our elevator's behavior state (IDLE, MOVING, DOOR_OPEN)
+// Update our elevator's behavior state (IDLE, MOVING, DOOR_OPEN)
 //		WithMyElevator(myID, func(e *common.Elevator) {
 //			e.Behaviour = state
 //		})
-		// Decide what to do now that the behavior has changed
+// Decide what to do now that the behavior has changed
 //		handleState(myID)
 //	}
 //}
@@ -53,10 +53,8 @@ func StateMachineLoop(myID string) {
 
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
-
 	fmt.Print("Entered executionloop")
 	for {
-
 		select {
 		// A user pressed a button (cab or hall)
 		case btn := <-buttonPressChan:
@@ -67,44 +65,46 @@ func StateMachineLoop(myID string) {
 		case assigned := <-AssignedHallCallChan:
 
 			fmt.Println("Assingment received", assigned)
+
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Requests[assigned.Floor][assigned.Button] = true
 			})
 
 			// If we’re idle, start moving or open the door immediately
-			if GetMyElevator(myID).Behaviour == common.IDLE {
-				e := GetMyElevator(myID)
-				next := ChooseDirection(e, e.Dirn)
+			e := GetMyElevator(myID)
+			next := ChooseDirection(e, e.Dirn)
 
-				WithMyElevator(myID, func(e *common.Elevator) {
-					e.Dirn = next.Dirn
-					e.Behaviour = next.Behaviour
-				})
+			WithMyElevator(myID, func(e *common.Elevator) {
+				e.Dirn = next.Dirn
+				e.Behaviour = next.Behaviour
+			})
 
-				if next.Dirn == elevio.MD_Stop {
-					fmt.Println(("Assigned call is at current floor"))
+			if next.Dirn == elevio.MD_Stop {
+				fmt.Println(("Assigned call is at current floor"))
 
-					ClearRequestsAtCurrentFloor(myID)
+				ClearRequestsAtCurrentFloor(myID)
 
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
-					OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+				OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+				OrderCompleteChan <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
 
-					DoorOpenChan <- struct{}{}
-					<-DoorCloseChan // Wait for door to fully close before moving again
-				} else {
-					elevio.SetMotorDirection(next.Dirn)
-					prevDirn = next.Dirn
-				}
-				/*select {
-				case StateChan <- next.Behaviour:
-				default:
-					fmt.Println("StateChan blocked in executionLoop (assigned)")
-				}
+				DoorOpenChan <- struct{}{}
+				<-DoorCloseChan // Wait for door to fully close before moving again
 
-				if next.Dirn != elevio.MD_Stop {
-					prevDirn = next.Dirn
-				}*/
+			} else {
+				fmt.Println(("Motor direction set"))
+				elevio.SetMotorDirection(next.Dirn)
+				prevDirn = next.Dirn
 			}
+			/*select {
+			case StateChan <- next.Behaviour:
+			default:
+				fmt.Println("StateChan blocked in executionLoop (assigned)")
+			}
+
+			if next.Dirn != elevio.MD_Stop {
+				prevDirn = next.Dirn
+			}*/
+			//}
 
 		//Elevator arrived at a new floor
 		case floor := <-floorSensorChan:
@@ -143,14 +143,12 @@ func StateMachineLoop(myID string) {
 
 			elevio.SetMotorDirection(next.Dirn)
 
-
 			//prevent blocking - added select stuff rather than just "StateChan <- someBehaviour" - under debug:
 			/*select {
 			case StateChan <- next.Behaviour:
 			default:
 				fmt.Println("StateChan blocked in executionLoop (door closed)")
 			}*/
-
 
 			if next.Dirn != elevio.MD_Stop {
 				prevDirn = next.Dirn
@@ -162,15 +160,14 @@ func StateMachineLoop(myID string) {
 func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn) {
 	switch btn.Button {
 	case elevio.BT_Cab:
-
 		// Cab calls are local and stored immediately
 		WithMyElevator(myID, func(e *common.Elevator) {
 			e.Requests[btn.Floor][elevio.BT_Cab] = true
 		})
 		backup.SaveCabRequests(GetMyElevator(myID))
 		UpdateCabLights(GetMyElevator(myID))
-
 		// React based on current state
+
 		switch GetMyElevator(myID).Behaviour {
 		case common.DOOR_OPEN:
 			// If we're at the same floor and it's clearable, refresh door timer
@@ -188,7 +185,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				e.Dirn = pair.Dirn
 				e.Behaviour = pair.Behaviour
 			})
-
 			switch pair.Behaviour {
 			case common.DOOR_OPEN:
 				fmt.Println("[IDLE] Opening door immediately at current floor.")
@@ -203,23 +199,21 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 				//default:
 				//	fmt.Print("StateChan blocked in handleButtonPress, case dooropen")
 				//}
-				
 
 			case common.MOVING:
 				fmt.Println("[IDLE] Starting to move.")
 				elevio.SetMotorDirection(pair.Dirn)
 				*prevDirn = pair.Dirn
-				
+
 				//select {
 				//case StateChan <- common.DOOR_OPEN:
 				//default:
 				//	fmt.Print("StateChan blocked in handleButtonPress, case moving")
 				//}
-				
 
 			case common.IDLE:
 				fmt.Println("[IDLE] No direction chosen. Staying idle.")
-				
+
 				/*case StateChan <- common.IDLE:
 				default:
 					fmt.Print("StateChan blocked in handleButtonPress, case idle")
@@ -235,7 +229,6 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 		AssignerInput <- AssignerMsg{Type: "assign", Data: btn}
 	}
 }
-
 
 func PrintElevatorState(myID string) {
 
@@ -258,8 +251,6 @@ func PrintElevatorState(myID string) {
 		fmt.Println("====================================")
 	}
 }
-
-
 
 /* Reaction when StesteChan is updated
 func handleState(myID string) {
