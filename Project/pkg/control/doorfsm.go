@@ -7,33 +7,38 @@ import (
 )
 
 func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time.Duration) {
+	obstructed := false
 	obstructionChan := make(chan bool)
 	go elevio.PollObstructionSwitch(obstructionChan)
 
-	var obstructed bool
+
+	var doorTimeout <- chan time.Time
 
 	for {
-		<-doorOpen
-		elevio.SetDoorOpenLamp(true)
-		timer := time.NewTimer(duration)
+		select {
+		case <-doorOpen :
+			elevio.SetDoorOpenLamp(true)
+			doorTimeout = time.After(duration)
 
-	doorOpenLoop:
-		for {
-			select {
-			case obstructed = <-obstructionChan:
-				fmt.Println("hey")
-				timer.Reset(duration)
+		/*case <-doorClosed :
+			elevio.SetDoorOpenLamp(fqlse)
+			timer := time.NewTimer(duration)*/
 
-			case <-timer.C:
-				if obstructed {
-					timer.Reset(duration)
-				} else {
-					elevio.SetDoorOpenLamp(false)
-					doorClosed <- struct{}{}
-					break doorOpenLoop
-				}
+		case obstructed = <-obstructionChan:
+			fmt.Println("here")
+			if obstructed && doorTimeout != nil {
+				doorTimeout = time.After(duration)
 			}
-		}
+		
+		case <-doorTimeout:
+			if obstructed {
+				doorTimeout = time.After(duration)
+			} else {
+				elevio.SetDoorOpenLamp(false)
+				doorClosed <- struct{}{}
+				doorTimeout = nil
+			}
+	}
 	}
 }
 
