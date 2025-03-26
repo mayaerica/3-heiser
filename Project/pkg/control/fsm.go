@@ -20,6 +20,7 @@ var (
 func InitFSM(myID string, initial common.Elevator) {
 	// Load any saved cab calls from disk (in case of crash recovery)
 	backup.LoadCabRequests(&initial)
+	UpdateCabLights(initial)
 
 	// Register our local elevator state in the shared state map
 	ElevSet <- ElevSetMsg{Fn: func(m map[string]common.Elevator) {
