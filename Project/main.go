@@ -25,6 +25,7 @@ func main() {
 			return
 		}
 		myID = ip
+		//myID = fmt.Sprintf("%s-%d", ip, os.Getpid()) //when running multiple elevators on the same machine
 	} else {
 		myID = os.Args[1]
 	}
@@ -39,7 +40,7 @@ func main() {
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    500*time.Millisecond,
+		DoorOpenDuration:    3*time.Second,
 	}
 
 	if initial.Floor == -1 {
