@@ -2,6 +2,7 @@ package control
 
 import (
 	"elevatorlab/elevio"
+	"fmt"
 	"time"
 )
 
@@ -20,6 +21,7 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 		for {
 			select {
 			case obstructed = <-obstructionChan:
+				fmt.Println("hey")
 				timer.Reset(duration)
 
 			case <-timer.C:

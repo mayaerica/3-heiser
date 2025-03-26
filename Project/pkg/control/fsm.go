@@ -128,6 +128,11 @@ func StateMachineLoop(myID string) {
 				UpdateCabLights(GetMyElevator(myID))
 				DoorOpenChan <- struct{}{}
 				<-DoorCloseChan // Wait for door to fully close before moving again
+
+				WithMyElevator(myID, func(e *common.Elevator) {
+					e.Behaviour = common.IDLE
+				})
+
 			}
 
 		// Door closed after timeout — pick next action
@@ -135,7 +140,6 @@ func StateMachineLoop(myID string) {
 			fmt.Println("Door closed, choosing next action...")
 			e := GetMyElevator(myID)
 			next := ChooseDirection(e, prevDirn)
-
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Dirn = next.Dirn
 				e.Behaviour = next.Behaviour
