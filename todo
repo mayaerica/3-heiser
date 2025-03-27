@@ -1,0 +1,21 @@
+Where I left off:
+    Elevators dont clear calls properly when called to by a different elevator. To fix this we just need to properly implement the orderID="Done" functions
+
+
+
+fix all variable names and functions that are local to have little initial letters
+
+fix AssignedHallCallChan needing to be 100 long to handle spam (this is in fsm). If its just 1 (no defined length), pressing about five buttons in the simulator at once freezes all functions
+
+make a function for the strucutrs in "handleButtonPress case btn.cab and statemachine case assigned as they have very similair structure
+
+Double check setmotordirectionlogic.
+
+Remove uneccesary behaviour changes (if need, but I suspect some places its changed twice)
+
+make same capitlization for letters in strings
+
+be consistant in use of words like pair or next
+
+
+use buttentype and that instead of numbers when applicable (or maybe other way around?)

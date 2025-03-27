@@ -60,13 +60,12 @@ func assigner(myID string) {
 				UpdateHallLightsFromPerspective(hallRequests)
 
 			case "complete":
-				fmt.Println("complete!!!")
+				fmt.Println("complete!!!", len(peerList.Peers))
 				// A hall call was served. Depending on peer count, we either mark it gone or unknown
-				if len(peerList.Peers) > 1 {
+				if true {//len(peerList.Peers) > 1 {
 					// If we're in a network, clear it
 					hallRequests[f][b] = common.NotRequested
 					if orderID[f][b] == myID {
-						time.Sleep(5*time.Second)
 						orderID[f][b] = "Done"
 					}
 				} else {
@@ -91,9 +90,10 @@ func assigner(myID string) {
 			// Store their view
 			
 			if theirs.ID == myID {
+				fmt.Printf("View from elevator %s: %+v\n", theirs.ID, theirs)
 				break
 			}
-			
+			fmt.Printf("View from elevator %s: %+v\n", theirs.ID, theirs)
 			perspectiveMap[theirs.ID] = theirs
 
 			// Reconcile their view with ours, button-by-button
@@ -104,6 +104,7 @@ func assigner(myID string) {
 						// If they say it's done, and we thought it was still active — clear it
 						if (hallRequests[f][b] == common.Assigned || hallRequests[f][b] == common.Unknown) && theirs.OrderID[f][b] == "Done" {
 							hallRequests[f][b] = common.NotRequested
+							orderID[f][b] = ""
 						}
 					case common.Unassigned:
 						// If they say unassigned, and we don't know about it — mark it unassigned
@@ -116,6 +117,10 @@ func assigner(myID string) {
 						// Only mark it assigned if all peers agree it's assigned to me
 						if EveryoneAgreesAssignedToMe(perspectiveMap, myID, f, b) {
 							hallRequests[f][b] = common.Assigned
+							AssignedHallCallChan <- elevio.ButtonEvent{
+								Floor:  f,
+								Button: elevio.ButtonType(b),
+							}
 							
 
 						}
@@ -174,20 +179,14 @@ func assignHallRequest(myID string, hallRequests [common.N_FLOORS][2]common.Orde
 	for elevID, assignments := range *hraOutput {
 		for floor, buttons := range assignments {
 			for btn, assigned := range buttons {
-				if assigned {
+				if assigned && orderID[floor][btn] != "Done" {
 
 								//added under blocking-debug:
 					fmt.Printf("[ASSIGNER] Assigning floor %d button %d to %s\n", floor, btn, elevID)
 
 					hallRequests[floor][btn] = common.Assigned
 					orderID[floor][btn] = elevID
-					if elevID == myID {
-									// This assignment is for 'me' → notify FSM
-						AssignedHallCallChan <- elevio.ButtonEvent{
-							Floor:  floor,
-							Button: elevio.ButtonType(btn),
-						}
-					}
+					
 				}
 			}
 		}

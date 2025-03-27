@@ -94,7 +94,6 @@ func ClearRequestsAtCurrentFloor(myID string) {
 					e.Requests[f][elevio.BT_HallDown] = false
 					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 				}
-				fmt.Println("\n\n\nSHOULD CLEAR THIS\n\n\n")
 				e.Requests[f][elevio.BT_HallUp] = false
 				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
 
@@ -113,9 +112,6 @@ func ClearRequestsAtCurrentFloor(myID string) {
 				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
 			}
 		}
-
-		// Print once the clearing process is completed
-		fmt.Println("\n\n\nCOMPLETE CLEARING\n\n\n\n")
 
 		// Save the elevator's updated request state
 		backup.SaveCabRequests(*e)
