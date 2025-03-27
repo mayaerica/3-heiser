@@ -71,17 +71,19 @@ func main() {
 	assignments := make(chan common.Elevator, 10)             // HRA-assigned elevator state
 	elevTx := make(chan common.Elevator, 10)                  // Outbound elevator info to others
 	peerTxEnable := make(chan bool)
+	elevSet := make(chan control.ElevSetMsg, 10)
+	elevGet := make(chan control.ElevGetMsg, 10)
 
 	// ────────────────────────────────
 	// Step 4: Shared State
 	// ────────────────────────────────
 	go peers.Transmitter(15680, myID, peerTxEnable)
-	go control.RunElevState(myID, initial, 1650)
+	go control.RunElevState(myID, initial, 1650, elevSet, elevGet)
 
 	// ────────────────────────────────
 	// Step 5: FSM
 	// ────────────────────────────────
-	go control.InitFSM(myID, initial, orderComplete)
+	go control.InitFSM(myID, initial, orderComplete, hallButtonPress, assignments, elevSet, elevGet)
 
 	// ────────────────────────────────
 	// Step 6: Door FSM (runs obstruction + close timer)
@@ -96,7 +98,7 @@ func main() {
 	// ────────────────────────────────
 	// Step 8: HRA Coordinator (load balancing of hall calls)
 	// ────────────────────────────────
-	go hra.Coordinator(allElevators, existingOrders, myID, assignments)
+	go hra.Coordinator(allElevators, existingOrders, myID, assignments, elevGet)
 
 	// ────────────────────────────────
 	// Step 9: Broadcast Initial Elevator State

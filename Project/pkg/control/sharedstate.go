@@ -18,14 +18,14 @@ type ElevGetMsg struct {
 }
 
 // The actual channels used throughout the system
-var (
-	ElevSet = make(chan ElevSetMsg) // Channel for setting elevator states
-	ElevGet = make(chan ElevGetMsg) // Channel for getting elevator states
-)
+// var (
+// 	ElevSet = make(chan ElevSetMsg) // Channel for setting elevator states
+// 	ElevGet = make(chan ElevGetMsg) // Channel for getting elevator states
+// )
 
 // This function manages the master map of all elevators in the system.
 // Think of this as the “control room” where every update request is handled one at a time.
-func RunElevState(myID string, initial common.Elevator, port int) {
+func RunElevState(myID string, initial common.Elevator, port int, ElevSet chan ElevSetMsg, ElevGet chan ElevGetMsg) {
 	tx := make(chan common.Elevator)           // What we broadcast to others
 	rx := make(chan common.Elevator)           // What we receive from others
 	peerUpdates := make(chan peers.PeerUpdate) // Keeps track of who’s online

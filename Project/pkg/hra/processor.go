@@ -29,7 +29,7 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 		fmt.Println("json.Marshal error:", err)
 		return nil
 	}
-
+	fmt.Println("JSON Input:", string(jsonBytes))
 	fmt.Println("[HRA] Running binary:", hraExecutable)
 	ret, err := exec.Command(hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
 	if err != nil {

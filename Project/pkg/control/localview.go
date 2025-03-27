@@ -37,7 +37,7 @@ func deepCopyElevator(e common.Elevator) common.Elevator {
 	return newElevator
 }
 
-func WithMyElevator(myID string, fn func(e *common.Elevator)) {
+func WithMyElevator(myID string, ElevSet chan ElevSetMsg, fn func(e *common.Elevator)) {
 	mu.Lock()
 	defer mu.Unlock()
 	ElevSet <- ElevSetMsg{
@@ -57,7 +57,7 @@ func WithMyElevator(myID string, fn func(e *common.Elevator)) {
 //
 // You send a read request to the control room, and it sends back the entire map.
 // You pick out your own elevator from the reply.
-func GetMyElevator(myID string) common.Elevator {
+func GetMyElevator(myID string, ElevGet chan ElevGetMsg) common.Elevator {
 	reply := make(chan map[string]common.Elevator) // where the answer will come
 	ElevGet <- ElevGetMsg{Reply: reply}            // ask for the map
 	return (<-reply)[myID]                         // extract your elevator
