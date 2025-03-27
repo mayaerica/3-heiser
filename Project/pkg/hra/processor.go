@@ -29,7 +29,7 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 		fmt.Println("json.Marshal error:", err)
 		return nil
 	}
-	fmt.Println("[HRA] Running binary:", hraExecutable)
+	// fmt.Println("[HRA] Running binary:", hraExecutable)
 	ret, err := exec.Command(hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
 	if err != nil {
 		fmt.Println("exec.Command error:", err)
@@ -44,10 +44,10 @@ func HRAProcessor(currentInput HRAInput) *map[string][][2]bool {
 		return nil
 	}
 
-	fmt.Printf("HRAoutput:\n")
-	for k, v := range *output {
-		fmt.Printf("  %6v  %+v\n", k, v)
-	}
+	// Tis print the id and the HRAProcessor
+	// for k, v := range *output {
+	// 	fmt.Printf(" hihi %6v  %+v\n", k, v)
+	// }
 
 	return output
 }

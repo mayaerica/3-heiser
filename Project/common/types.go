@@ -37,12 +37,12 @@ const (
 	NotSeen OrderState = iota          // No elevator has seen this call
 	SeenBySomeone                      // At least one elevator has seen it
 	SeenByEveryone                     // All elevators agree the call exists
-	Uncertain                          // Used to exist, but peers dropped
+	Uncertain                          
 )
 
 type Perspective struct {
 	ID          string
-	OrderID [N_FLOORS][2]string
+	//OrderID [N_FLOORS][2]string       //NOT USING ANYMORE
 	Perspective [N_FLOORS][2]OrderState
 }
 

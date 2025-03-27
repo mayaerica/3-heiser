@@ -11,21 +11,20 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 	obstructionChan := make(chan bool)
 	go elevio.PollObstructionSwitch(obstructionChan)
 
-
-	var doorTimeout <- chan time.Time
+	var doorTimeout <-chan time.Time
 
 	for {
 		select {
-		case <-doorOpen :
+		case <-doorOpen:
 			elevio.SetDoorOpenLamp(true)
 			doorTimeout = time.After(duration)
 
 		case obstructed = <-obstructionChan:
-			fmt.Println("here")
+			fmt.Println("[DOORFSM] : Obstruction detected")
 			if obstructed && doorTimeout != nil {
 				doorTimeout = time.After(duration)
 			}
-		
+
 		case <-doorTimeout:
 			if obstructed {
 				doorTimeout = time.After(duration)
@@ -34,8 +33,6 @@ func DoorFSM(doorOpen <-chan struct{}, doorClosed chan<- struct{}, duration time
 				doorClosed <- struct{}{}
 				doorTimeout = nil
 			}
-	}
+		}
 	}
 }
-
-

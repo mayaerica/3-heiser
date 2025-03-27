@@ -6,7 +6,6 @@ import (
 	"elevatorlab/pkg/utils"
 )
 
-// Types needed for JSON encoding/decoding
 type HRAElevState struct {
 	Behaviour   string `json:"behaviour"`
 	Floor       int    `json:"floor"`
@@ -19,7 +18,6 @@ type HRAInput struct {
 	States       map[string]HRAElevState  `json:"states"`
 }
 
-// Builds input for the HRA binary
 func CreateHRAInput(
 	elevators map[string]common.Elevator,
 	hallRequests [common.N_FLOORS][2]bool,
