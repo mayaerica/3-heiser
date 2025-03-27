@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-var (
-	DoorOpenChan       = make(chan struct{})
-	DoorCloseChan      = make(chan struct{})
-	OrderCompleteChan  = make(chan elevio.ButtonEvent)
-	ExistingOrdersChan = make(chan [common.N_FLOORS][2]bool)
-)
+// var (
+// 	DoorOpenChan       = make(chan struct{})
+// 	DoorCloseChan      = make(chan struct{})
+// 	// OrderCompleteChan  = make(chan elevio.ButtonEvent)
+// 	ExistingOrdersChan = make(chan [common.N_FLOORS][2]bool)
+// )
 
 type AssignerMsg struct {
 	Data elevio.ButtonEvent
@@ -20,21 +20,30 @@ type AssignerMsg struct {
 
 var AssignerInput = make(chan AssignerMsg)
 
-func InitFSM(myID string, initial common.Elevator) {
+func InitFSM(myID string, initial common.Elevator, orderComplete chan elevio.ButtonEvent) {
 	// backup.LoadCabRequests(&initial)
 	ElevSet <- ElevSetMsg{Fn: func(m map[string]common.Elevator) {
 		m[myID] = initial
 	}}
-	go StateMachineLoop(myID)
+	DoorOpenChan := make(chan struct{})
+	DoorCloseChan := make(chan struct{})
+	ExistingOrdersChan := make(chan [common.N_FLOORS][2]bool)
+	go StateMachineLoop(myID, DoorOpenChan, DoorCloseChan, ExistingOrdersChan, orderComplete)
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration)
 	go PrintElevatorState(myID)
 	fmt.Print("\n [FSM]: init done")
 }
 
-func StateMachineLoop(myID string) {
-	fmt.Print("\n [FSM]: Enter in state machin loop")
-	buttonPressChan := make(chan elevio.ButtonEvent)
-	floorSensorChan := make(chan int)
+func StateMachineLoop(
+	myID string,
+	DoorOpenChan chan struct{},
+	DoorCloseChan chan struct{},
+	ExistingOrdersChan chan [common.N_FLOORS][2]bool,
+	OrderCompleteChan chan elevio.ButtonEvent) {
+
+	fmt.Println("\n [FSM]: Enter in state machin loop")
+	buttonPressChan := make(chan elevio.ButtonEvent, 100)
+	floorSensorChan := make(chan int, 100)
 	//nexMove:= make....
 
 	go elevio.PollButtons(buttonPressChan)
@@ -42,20 +51,8 @@ func StateMachineLoop(myID string) {
 
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
-	// go func() {
-	// 	for orders := range ExistingOrdersChan {
-	// 		fmt.Print("[FSM]: orders recieved")
-	// 		WithMyElevator(myID, func(e *common.Elevator) {
-	// 			for f := 0; f < common.N_FLOORS; f++ {
-	// 				for b := 0; b < 2; b++ {
-	// 					e.Requests[f][b] = orders[f][b]
-	// 				}
-	// 			}
-	// 		})
-	// 	}
-	// }()
-
 	for {
+		fmt.Println("[FSM]: Looping")
 		select {
 		case btn := <-buttonPressChan:
 			fmt.Print("[FSM]: button pressed")
@@ -67,16 +64,24 @@ func StateMachineLoop(myID string) {
 			WithMyElevator(myID, func(e *common.Elevator) {
 				e.Floor = floor
 			})
+			fmt.Println("floor @1")
 			e := GetMyElevator(myID)
 			if RequestShouldStop(e) {
+				fmt.Println("floor @2")
 				StopElevator()
+				fmt.Println("floor @3")
 				e = clearAtCurrentFloor(e, OrderCompleteChan)
+				fmt.Println("floor @4")
 				WithMyElevator(myID, func(me *common.Elevator) {
 					*me = e
 				})
+				fmt.Println("floor @5")
 				UpdateCabLights(e)
-				openDoor(myID)
+				fmt.Println("floor @6")
+				openDoor(myID, DoorOpenChan)
+				fmt.Println("floor @7")
 			}
+			fmt.Println("floor done")
 
 		case orders := <-ExistingOrdersChan:
 			fmt.Print("[FSM]: orders received")
@@ -91,6 +96,7 @@ func StateMachineLoop(myID string) {
 			})
 
 		case <-DoorCloseChan:
+			fmt.Println("[FSM]: close door")
 			e := GetMyElevator(myID)
 			next := ChooseDirection(e, e.Dirn)
 			WithMyElevator(myID, func(e *common.Elevator) {
@@ -116,7 +122,7 @@ func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dir
 	}
 }
 
-func openDoor(myID string) {
+func openDoor(myID string, DoorOpenChan chan struct{}) {
 	WithMyElevator(myID, func(e *common.Elevator) {
 		e.Behaviour = common.DOOR_OPEN
 	})

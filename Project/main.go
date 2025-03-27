@@ -4,9 +4,9 @@ import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/control"
+	"elevatorlab/pkg/hra"
 	"elevatorlab/pkg/network/localip"
 	"elevatorlab/pkg/network/peers"
-	"elevatorlab/pkg/hra"
 	"flag"
 	"fmt"
 	"os"
@@ -64,12 +64,12 @@ func main() {
 	// ────────────────────────────────
 	// Step 3: Define Channels
 	// ────────────────────────────────
-	hallButtonPress := make(chan elevio.ButtonEvent, 10)                  // All hall calls
-	orderComplete := make(chan elevio.ButtonEvent, 10)                   // Signals a hall call was completed
-	existingOrders := make(chan [common.N_FLOORS][2]bool, 10)            // Confirmed orders from sync
-	allElevators := make(chan map[string]common.Elevator, 10)            // Shared elevator state
-	assignments := make(chan common.Elevator, 10)                        // HRA-assigned elevator state
-	elevTx := make(chan common.Elevator, 10)                             // Outbound elevator info to others
+	hallButtonPress := make(chan elevio.ButtonEvent, 10)      // All hall calls
+	orderComplete := make(chan elevio.ButtonEvent, 10)        // Signals a hall call was completed
+	existingOrders := make(chan [common.N_FLOORS][2]bool, 10) // Confirmed orders from sync
+	allElevators := make(chan map[string]common.Elevator, 10) // Shared elevator state
+	assignments := make(chan common.Elevator, 10)             // HRA-assigned elevator state
+	elevTx := make(chan common.Elevator, 10)                  // Outbound elevator info to others
 	peerTxEnable := make(chan bool)
 
 	// ────────────────────────────────
@@ -81,12 +81,12 @@ func main() {
 	// ────────────────────────────────
 	// Step 5: FSM
 	// ────────────────────────────────
-	go control.InitFSM(myID, initial)
+	go control.InitFSM(myID, initial, orderComplete)
 
 	// ────────────────────────────────
 	// Step 6: Door FSM (runs obstruction + close timer)
 	// ────────────────────────────────
-	go control.DoorFSM(control.DoorOpenChan, control.DoorCloseChan, initial.DoorOpenDuration)
+	// go control.DoorFSM(control.DoorOpenChan, control.DoorCloseChan, initial.DoorOpenDuration)
 
 	// ────────────────────────────────
 	// Step 7: Synchronizer (hall order consensus logic)
@@ -97,7 +97,7 @@ func main() {
 	// Step 8: HRA Coordinator (load balancing of hall calls)
 	// ────────────────────────────────
 	go hra.Coordinator(allElevators, existingOrders, myID, assignments)
-	
+
 	// ────────────────────────────────
 	// Step 9: Broadcast Initial Elevator State
 	// ────────────────────────────────
