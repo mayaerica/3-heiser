@@ -5,11 +5,11 @@ Where I left off:
 
 fix all variable names and functions that are local to have little initial letters
 
-fix AssignedHallCallChan needing to be 100 long to handle spam (this is in fsm). If its just 1 (no defined length), pressing about five buttons in the simulator at once freezes all functions
+[DONE] fix AssignedHallCallChan needing to be 100 long to handle spam (this is in fsm). If its just 1 (no defined length), pressing about five buttons in the simulator at once freezes all functions
 
 make a function for the strucutrs in "handleButtonPress case btn.cab and statemachine case assigned as they have very similair structure
 
-Double check setmotordirectionlogic.
+[DONE] Double check setmotordirectionlogic.
 
 Remove uneccesary behaviour changes (if need, but I suspect some places its changed twice)
 
