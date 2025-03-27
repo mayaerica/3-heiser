@@ -60,7 +60,6 @@ func RequestsHere(e common.Elevator) bool {
 	return false
 }
 
-
 func clearAtCurrentFloor(e common.Elevator, orderComplete chan elevio.ButtonEvent) common.Elevator {
 	switch e.ClearRequestVariant {
 
@@ -75,7 +74,7 @@ func clearAtCurrentFloor(e common.Elevator, orderComplete chan elevio.ButtonEven
 
 		switch e.Dirn {
 		case elevio.MD_Up:
-			if !e.HasRequestsAbove(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallUp] {
+			if !e.HasRequestsAbove(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallUp] && e.Requests[e.Floor][elevio.BT_HallDown] {
 				e.Requests[e.Floor][elevio.BT_HallDown] = false
 				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
 			}
@@ -83,7 +82,7 @@ func clearAtCurrentFloor(e common.Elevator, orderComplete chan elevio.ButtonEven
 			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
 
 		case elevio.MD_Down:
-			if !e.HasRequestsBelow(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallDown] {
+			if !e.HasRequestsBelow(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallDown] && e.Requests[e.Floor][elevio.BT_HallUp] {
 				e.Requests[e.Floor][elevio.BT_HallUp] = false
 				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
 			}
@@ -91,15 +90,22 @@ func clearAtCurrentFloor(e common.Elevator, orderComplete chan elevio.ButtonEven
 			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
 
 		case elevio.MD_Stop:
-			e.Requests[e.Floor][elevio.BT_HallUp] = false
-			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
-			e.Requests[e.Floor][elevio.BT_HallDown] = false
-			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+			if e.Requests[e.Floor][elevio.BT_HallUp] {
+				e.Requests[e.Floor][elevio.BT_HallUp] = false
+				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+			}
+			if e.Requests[e.Floor][elevio.BT_HallDown] {
+				e.Requests[e.Floor][elevio.BT_HallDown] = false
+				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+			}
+			// e.Requests[e.Floor][elevio.BT_HallUp] = false
+			// orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+			// e.Requests[e.Floor][elevio.BT_HallDown] = false
+			// orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
 		}
 	}
 	return e
 }
-
 
 func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.ButtonType) bool {
 	if e.Floor != btnFloor {
@@ -118,7 +124,6 @@ func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.Butt
 		return false
 	}
 }
-
 
 func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehaviourPair {
 	switch prevDirn {

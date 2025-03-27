@@ -72,6 +72,7 @@ func StateMachineLoop(
 
 			switch e.Behaviour {
 			case common.DOOR_OPEN:
+				fmt.Println("[FSM]: DOOR OPEN")
 				if e.Floor == btn.Floor &&
 					((e.Dirn == elevio.MD_Up && btn.Button == elevio.BT_HallUp) ||
 						(e.Dirn == elevio.MD_Down && btn.Button == elevio.BT_HallDown) ||
@@ -92,6 +93,7 @@ func StateMachineLoop(
 				}
 
 			case common.MOVING:
+				fmt.Println("[FSM]: MOVING")
 				if btn.Button == elevio.BT_Cab {
 					e.Requests[btn.Floor][btn.Button] = true
 					UpdateCabLights(e)
@@ -101,6 +103,7 @@ func StateMachineLoop(
 				}
 
 			case common.IDLE:
+				fmt.Println("[FSM]: IDLE")
 				if btn.Floor == e.Floor {
 					e.Behaviour = common.DOOR_OPEN
 					WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
@@ -110,7 +113,7 @@ func StateMachineLoop(
 						e.Requests[btn.Floor][btn.Button] = true
 						UpdateCabLights(e)
 						WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
-						prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
+						prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
 					} else {
 						hallButtonPress <- btn
 					}
@@ -144,7 +147,7 @@ func StateMachineLoop(
 			})
 			elevio.SetDoorOpenLamp(false)
 
-			prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
+			prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
 
 		case assigned := <-eFromHRA:
 			fmt.Println("[FSM]: Recieved assigned tasks")
@@ -155,45 +158,46 @@ func StateMachineLoop(
 				}
 			})
 			e := GetMyElevator(myID, ElevGet)
-			if e.Behaviour == common.IDLE{
-				prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
+			if e.Behaviour == common.IDLE {
+				prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
 			} else if e.Behaviour == common.DOOR_OPEN {
 				e = clearAtCurrentFloor(e, OrderCompleteChan)
 				UpdateCabLights(e)
 				WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
 				openDoor(myID, DoorOpenChan, ElevSet)
 			}
-			
+
 		}
 	}
 }
-func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCompleteChan chan elevio.ButtonEvent,ElevSet chan ElevSetMsg, DoorOpenChan chan struct{}) elevio.Dirn {
+func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCompleteChan chan elevio.ButtonEvent, ElevSet chan ElevSetMsg, DoorOpenChan chan struct{}) elevio.Dirn {
 	fmt.Println("[FSM]: trigger")
-			e := GetMyElevator(myID, ElevGet)
-			next := ChooseDirection(e, prevDirn)
-			prevDirn = e.Dirn
-			e.Dirn = next.Dirn
-			e.Behaviour = next.Behaviour
+	e := GetMyElevator(myID, ElevGet)
+	next := ChooseDirection(e, prevDirn)
+	prevDirn = e.Dirn
+	e.Dirn = next.Dirn
+	e.Behaviour = next.Behaviour
 
-			if next.Behaviour == common.DOOR_OPEN &&
-				(next.Dirn == elevio.MD_Up || next.Dirn == elevio.MD_Down) {
-				e.Dirn = elevio.MD_Stop
-				e.Behaviour = common.DOOR_OPEN
-			}
+	if next.Behaviour == common.DOOR_OPEN &&
+		(next.Dirn == elevio.MD_Up || next.Dirn == elevio.MD_Down) {
+		e.Dirn = elevio.MD_Stop
+		e.Behaviour = common.DOOR_OPEN
+	}
 
-			if e.Behaviour == common.DOOR_OPEN {
-				e = clearAtCurrentFloor(e, OrderCompleteChan)
-				UpdateCabLights(e)
-				WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
-				openDoor(myID, DoorOpenChan, ElevSet)
-			}
+	if e.Behaviour == common.DOOR_OPEN {
+		e = clearAtCurrentFloor(e, OrderCompleteChan)
+		UpdateCabLights(e)
+		WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
+		openDoor(myID, DoorOpenChan, ElevSet)
+	}
 
-			WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
+	WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
 
-			elevio.SetMotorDirection(e.Dirn)
-			fmt.Printf("[FSM] Requests: %+v\n", e.Requests)
-			return prevDirn
+	elevio.SetMotorDirection(e.Dirn)
+	fmt.Printf("[FSM] Requests: %+v\n", e.Requests)
+	return prevDirn
 }
+
 // for {
 // 	fmt.Println("[FSM]: Looping")
 // 	select {
