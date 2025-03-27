@@ -64,15 +64,15 @@ func main() {
 	// ────────────────────────────────
 	// Step 3: Define Channels
 	// ────────────────────────────────
-	hallButtonPress := make(chan elevio.ButtonEvent, 10)      // All hall calls
-	orderComplete := make(chan elevio.ButtonEvent, 10)        // Signals a hall call was completed
+	hallButtonPress := make(chan elevio.ButtonEvent, 3)      // All hall calls
+	orderComplete := make(chan elevio.ButtonEvent, 3)        // Signals a hall call was completed
 	existingOrders := make(chan [common.N_FLOORS][2]bool, 10) // Confirmed orders from sync
-	allElevators := make(chan map[string]common.Elevator, 10) // Shared elevator state
+	allElevators := make(chan map[string]common.Elevator, 6) // Shared elevator state
 	assignments := make(chan common.Elevator, 10)             // HRA-assigned elevator state
 	elevTx := make(chan common.Elevator, 10)                  // Outbound elevator info to others
 	peerTxEnable := make(chan bool)
-	elevSet := make(chan control.ElevSetMsg, 10)
-	elevGet := make(chan control.ElevGetMsg, 10)
+	elevSet := make(chan control.ElevSetMsg)
+	elevGet := make(chan control.ElevGetMsg)
 
 	// ────────────────────────────────
 	// Step 4: Shared State
