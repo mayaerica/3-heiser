@@ -30,6 +30,7 @@ func RunSynchronizer(
 	ticker := time.NewTicker(20 * time.Millisecond)
 
 	for {
+		UpdateHallLightsFromPerspective(localPerspective)
 		select {
 		case btn := <-hallButtonPress:
 			if localPerspective[btn.Floor][btn.Button] == common.NotSeen || localPerspective[btn.Floor][btn.Button] == common.Uncertain {
@@ -98,6 +99,7 @@ func RunSynchronizer(
 				}
 			}
 		}
+		
 	}
 }
 
@@ -120,7 +122,3 @@ func seenByEveryoneMatrix(perspective [common.N_FLOORS][2]common.OrderState) [co
 	}
 	return result
 }
-
-
-
-
