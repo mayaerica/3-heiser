@@ -92,6 +92,7 @@ func PollButtons(receiver chan<- ButtonEvent) {
 				v := GetButton(b, f)
 				if v != prev[f][b] && v != false {
 					receiver <- ButtonEvent{f, ButtonType(b)}
+
 				}
 				prev[f][b] = v
 			}
@@ -107,7 +108,7 @@ func PollFloorSensor(receiver chan<- int) {
 		if v != prev && v != -1 {
 
 			receiver <- v
-			fmt.Println("Floor has been sensed!")
+			fmt.Println("\n Floor has been sensed!")
 		}
 		prev = v
 	}
