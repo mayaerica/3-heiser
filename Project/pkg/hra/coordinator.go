@@ -7,6 +7,7 @@ import (
 	"reflect"
 )
 
+
 // assigner continuously reads the global elevator state and confirmed hall calls,
 // runs the HRA optimizer, and sends assigned hall calls to the local FSM.
 func Coordinator(
@@ -22,7 +23,7 @@ func Coordinator(
 
 	for {
 		select {
-		case elevMap = <-allElevators:
+		case elevMap = <-allElevators: // this is now a deep copy of the map, but as long as it doesnt need to be the current map all should be well
 		case hallRequests = <-existingOrders:
 		}
 
@@ -38,3 +39,4 @@ func Coordinator(
 		eFromHRA <- assignedElev
 	}
 }
+

@@ -47,13 +47,13 @@ func RunElevState(myID string, initial common.Elevator, port int, allElevators c
 			// Received a broadcast from another elevator
 			// Update their entry in our map
 			elevators[other.ID] = other
-			allElevators <- elevators
+			allElevators <- copyElevMap(elevators)
 
 		case set := <-ElevSet:
 			// Someone wants to update the elevator map
 			// We run their function on it (e.g., "change floor" or "add request")
 			set.Fn(elevators)
-			allElevators <- elevators
+			allElevators <- copyElevMap(elevators)
 
 		case get := <-ElevGet:
 			// Someone wants to read the map (safely)
@@ -65,7 +65,7 @@ func RunElevState(myID string, initial common.Elevator, port int, allElevators c
 			for _, lostID := range update.Lost {
 				delete(elevators, lostID)
 			}
-			allElevators <- elevators
+			allElevators <- copyElevMap(elevators)
 
 		case <-ticker.C:
 			// Time to broadcast our own state to the network
@@ -78,9 +78,29 @@ func RunElevState(myID string, initial common.Elevator, port int, allElevators c
 
 // Makes a deep copy of the map so no one touches the original by accident
 func copyElevMap(original map[string]common.Elevator) map[string]common.Elevator {
-	copy := make(map[string]common.Elevator)
-	for id, elev := range original {
-		copy[id] = elev
+	copyMap := make(map[string]common.Elevator)
+	for key, value := range original {
+		// Deep copy the nested structures (e.g., slices and other structs)
+		newElevator := common.Elevator{
+			ID:                  value.ID,
+			Floor:               value.Floor,
+			Dirn:                value.Dirn,
+			Behaviour:           value.Behaviour, // Assuming Behaviour is a simple struct
+			ClearRequestVariant: value.ClearRequestVariant, // Assuming ClearRequestVariant is a simple struct
+			DoorOpenDuration:    value.DoorOpenDuration,
+		}
+
+		// Deep copy the Requests 2D array/slice
+		newElevator.Requests = [common.N_FLOORS][common.N_BUTTONS]bool{} // Zero out the new array
+		for i := 0; i < common.N_FLOORS; i++ {
+			for j := 0; j < common.N_BUTTONS; j++ {
+				newElevator.Requests[i][j] = value.Requests[i][j]
+			}
+		}
+
+		// Add the copied elevator to the map
+		copyMap[key] = newElevator
 	}
-	return copy
+
+	return copyMap
 }
