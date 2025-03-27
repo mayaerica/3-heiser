@@ -42,7 +42,6 @@ const (
 
 type Perspective struct {
 	ID          string
-	//OrderID [N_FLOORS][2]string       //NOT USING ANYMORE
 	Perspective [N_FLOORS][2]OrderState
 }
 

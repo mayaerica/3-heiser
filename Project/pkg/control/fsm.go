@@ -61,7 +61,7 @@ func StateMachineLoop(
 	go elevio.PollButtons(buttonPressChan)
 	go elevio.PollFloorSensor(floorSensorChan)
 
-	trigger := make(chan struct{}, 3)
+	//trigger := make(chan struct{}, 3)
 	var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	for {
@@ -110,7 +110,7 @@ func StateMachineLoop(
 						e.Requests[btn.Floor][btn.Button] = true
 						UpdateCabLights(e)
 						WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
-						trigger <- struct{}{}
+						prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
 					} else {
 						hallButtonPress <- btn
 					}
@@ -143,7 +143,8 @@ func StateMachineLoop(
 				e.Behaviour = common.IDLE
 			})
 			elevio.SetDoorOpenLamp(false)
-			trigger <- struct{}{}
+
+			prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
 
 		case assigned := <-eFromHRA:
 			fmt.Println("[FSM]: Recieved assigned tasks")
@@ -154,12 +155,20 @@ func StateMachineLoop(
 				}
 			})
 			e := GetMyElevator(myID, ElevGet)
-			if e.Behaviour == common.IDLE {
-				trigger <- struct{}{}
+			if e.Behaviour == common.IDLE{
+				prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan,ElevSet, DoorOpenChan)
+			} else if e.Behaviour == common.DOOR_OPEN {
+				e = clearAtCurrentFloor(e, OrderCompleteChan)
+				UpdateCabLights(e)
+				WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
+				openDoor(myID, DoorOpenChan, ElevSet)
 			}
-
-		case <-trigger:
-			fmt.Println("[FSM]: trigger")
+			
+		}
+	}
+}
+func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCompleteChan chan elevio.ButtonEvent,ElevSet chan ElevSetMsg, DoorOpenChan chan struct{}) elevio.Dirn {
+	fmt.Println("[FSM]: trigger")
 			e := GetMyElevator(myID, ElevGet)
 			next := ChooseDirection(e, prevDirn)
 			prevDirn = e.Dirn
@@ -183,10 +192,8 @@ func StateMachineLoop(
 
 			elevio.SetMotorDirection(e.Dirn)
 			fmt.Printf("[FSM] Requests: %+v\n", e.Requests)
-		}
-	}
+			return prevDirn
 }
-
 // for {
 // 	fmt.Println("[FSM]: Looping")
 // 	select {
