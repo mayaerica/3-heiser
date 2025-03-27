@@ -78,7 +78,7 @@ func main() {
 	// Step 4: Shared State
 	// ────────────────────────────────
 	go peers.Transmitter(15680, myID, peerTxEnable)
-	go control.RunElevState(myID, initial, 1650, elevSet, elevGet)
+	go control.RunElevState(myID, initial, 1650, allElevators, elevSet, elevGet)
 
 	// ────────────────────────────────
 	// Step 5: FSM

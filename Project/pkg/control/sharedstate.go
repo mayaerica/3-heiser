@@ -25,7 +25,7 @@ type ElevGetMsg struct {
 
 // This function manages the master map of all elevators in the system.
 // Think of this as the “control room” where every update request is handled one at a time.
-func RunElevState(myID string, initial common.Elevator, port int, ElevSet chan ElevSetMsg, ElevGet chan ElevGetMsg) {
+func RunElevState(myID string, initial common.Elevator, port int, allElevators chan map[string]common.Elevator, ElevSet chan ElevSetMsg, ElevGet chan ElevGetMsg) {
 	tx := make(chan common.Elevator)           // What we broadcast to others
 	rx := make(chan common.Elevator)           // What we receive from others
 	peerUpdates := make(chan peers.PeerUpdate) // Keeps track of who’s online
@@ -47,11 +47,13 @@ func RunElevState(myID string, initial common.Elevator, port int, ElevSet chan E
 			// Received a broadcast from another elevator
 			// Update their entry in our map
 			elevators[other.ID] = other
+			allElevators <- elevators
 
 		case set := <-ElevSet:
 			// Someone wants to update the elevator map
 			// We run their function on it (e.g., "change floor" or "add request")
 			set.Fn(elevators)
+			allElevators <- elevators
 
 		case get := <-ElevGet:
 			// Someone wants to read the map (safely)
@@ -63,6 +65,7 @@ func RunElevState(myID string, initial common.Elevator, port int, ElevSet chan E
 			for _, lostID := range update.Lost {
 				delete(elevators, lostID)
 			}
+			allElevators <- elevators
 
 		case <-ticker.C:
 			// Time to broadcast our own state to the network
