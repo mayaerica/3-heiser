@@ -26,14 +26,15 @@ func InitFSM(myID string,
 	hallButtonPress chan elevio.ButtonEvent,
 	eFromHRA chan common.Elevator,
 	ElevSet chan ElevSetMsg,
-	ElevGet chan ElevGetMsg) {
+	ElevGet chan ElevGetMsg,
+	ExistingOrdersChan chan [common.N_FLOORS][2]bool) {
 	// backup.LoadCabRequests(&initial)
 	ElevSet <- ElevSetMsg{Fn: func(m map[string]common.Elevator) {
 		m[myID] = initial
 	}}
 	DoorOpenChan := make(chan struct{})
 	DoorCloseChan := make(chan struct{})
-	ExistingOrdersChan := make(chan [common.N_FLOORS][2]bool)
+	
 
 	go StateMachineLoop(myID, DoorOpenChan, DoorCloseChan, ExistingOrdersChan, orderComplete, hallButtonPress, eFromHRA, ElevSet, ElevGet)
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration)
@@ -257,17 +258,17 @@ func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCo
 // }
 
 // CHECK THIS
-func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn, ElevSet chan ElevSetMsg, ElevGet chan ElevGetMsg) {
-	if btn.Button == elevio.BT_Cab {
-		WithMyElevator(myID, ElevSet, func(e *common.Elevator) {
-			e.Requests[btn.Floor][btn.Button] = true
-		})
-		// backup.SaveCabRequests(GetMyElevator(myID))
-		UpdateCabLights(GetMyElevator(myID, ElevGet))
-	} else {
-		AssignerInput <- AssignerMsg{Data: btn}
-	}
-}
+// func handleButtonPress(myID string, btn elevio.ButtonEvent, prevDirn *elevio.Dirn, ElevSet chan ElevSetMsg, ElevGet chan ElevGetMsg) {
+// 	if btn.Button == elevio.BT_Cab {
+// 		WithMyElevator(myID, ElevSet, func(e *common.Elevator) {
+// 			e.Requests[btn.Floor][btn.Button] = true
+// 		})
+// 		// backup.SaveCabRequests(GetMyElevator(myID))
+// 		UpdateCabLights(GetMyElevator(myID, ElevGet))
+// 	} else {
+// 		AssignerInput <- AssignerMsg{Data: btn}
+// 	}
+// }
 
 func openDoor(myID string, DoorOpenChan chan struct{}, ElevSet chan ElevSetMsg) {
 	WithMyElevator(myID, ElevSet, func(e *common.Elevator) {

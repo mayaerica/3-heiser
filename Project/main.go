@@ -83,7 +83,7 @@ func main() {
 	// ────────────────────────────────
 	// Step 5: FSM
 	// ────────────────────────────────
-	go control.InitFSM(myID, initial, orderComplete, hallButtonPress, assignments, elevSet, elevGet)
+	go control.InitFSM(myID, initial, orderComplete, hallButtonPress, assignments, elevSet, elevGet, existingOrders)
 
 	// ────────────────────────────────
 	// Step 6: Door FSM (runs obstruction + close timer)
