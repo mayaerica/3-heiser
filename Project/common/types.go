@@ -34,10 +34,10 @@ type DirnBehaviourPair struct {
 type OrderState int
 
 const (
-	Unknown      OrderState = iota
-	NotRequested            //no button press
-	Unassigned              //button press known, but needs to be assigned
-	Assigned                //while this request has been assigned
+	NotSeen OrderState = iota          // No elevator has seen this call
+	SeenBySomeone                      // At least one elevator has seen it
+	SeenByEveryone                     // All elevators agree the call exists
+	Uncertain                          // Used to exist, but peers dropped
 )
 
 type Perspective struct {

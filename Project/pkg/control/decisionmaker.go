@@ -3,8 +3,6 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
-	"elevatorlab/pkg/backup"
-	"fmt"
 )
 
 // Determine whether to stop at current floor
@@ -12,12 +10,7 @@ import (
 // Determine whether to stop at current floor
 func RequestShouldStop(e common.Elevator) bool {
 	f := e.Floor
-	/*fmt.Printf("[DEBUG] RequestShouldStop: floor=%d dir=%v cab=%v up=%v down=%v\n",
-		f, e.Dirn,
-		e.Requests[f][elevio.BT_Cab],
-		e.Requests[f][elevio.BT_HallUp],
-		e.Requests[f][elevio.BT_HallDown],
-	)*/
+
 	switch e.Dirn {
 	case elevio.MD_Down:
 		return e.Requests[f][elevio.BT_HallDown] ||
@@ -67,59 +60,47 @@ func RequestsHere(e common.Elevator) bool {
 	return false
 }
 
-// Clear requests at current floor and notify network
-func ClearRequestsAtCurrentFloor(myID string) {
-	WithMyElevator(myID, func(e *common.Elevator) {
-		f := e.Floor
-		d := e.Dirn
 
-		switch e.ClearRequestVariant {
-		case common.CV_All:
-			for btn := 0; btn < common.N_BUTTONS; btn++ {
-				e.Requests[f][btn] = false
-				if e.Requests[f][elevio.BT_HallUp] {
-					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
-				}
-				if e.Requests[f][elevio.BT_HallDown] {
-					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
-				}
-			}
+func clearAtCurrentFloor(e common.Elevator, orderComplete chan elevio.ButtonEvent) common.Elevator {
+	switch e.ClearRequestVariant {
 
-		case common.CV_InDirn:
-			e.Requests[f][elevio.BT_Cab] = false
-
-			switch d {
-			case elevio.MD_Up:
-				if !RequestsAbove(*e) {
-					e.Requests[f][elevio.BT_HallDown] = false
-					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
-				}
-				e.Requests[f][elevio.BT_HallUp] = false
-				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
-
-			case elevio.MD_Down:
-				if !RequestsBelow(*e) {
-					e.Requests[f][elevio.BT_HallUp] = false
-					AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
-				}
-				e.Requests[f][elevio.BT_HallDown] = false
-				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
-
-			case elevio.MD_Stop:
-				e.Requests[f][elevio.BT_HallUp] = false
-				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallUp}}
-				e.Requests[f][elevio.BT_HallDown] = false
-				AssignerInput <- AssignerMsg{Type: "complete", Data: elevio.ButtonEvent{Floor: f, Button: elevio.BT_HallDown}}
-			}
+	case common.CV_All:
+		for btn := 0; btn < elevio.N_BUTTONS; btn++ {
+			e.Requests[e.Floor][btn] = false
 		}
 
-		// Save the elevator's updated request state
-		backup.SaveCabRequests(*e)
-	})
+	case common.CV_InDirn:
+		e.Requests[e.Floor][elevio.BT_Cab] = false
+		UpdateCabLights(e)
+
+		switch e.Dirn {
+		case elevio.MD_Up:
+			if !e.HasRequestsAbove(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallUp] {
+				e.Requests[e.Floor][elevio.BT_HallDown] = false
+				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+			}
+			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+
+		case elevio.MD_Down:
+			if !e.HasRequestsBelow(e.Floor) && !e.Requests[e.Floor][elevio.BT_HallDown] {
+				e.Requests[e.Floor][elevio.BT_HallUp] = false
+				orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+			}
+			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+
+		case elevio.MD_Stop:
+			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallUp}
+			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			orderComplete <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.BT_HallDown}
+		}
+	}
+	return e
 }
 
 
-// Instant clear check for newly pressed button
 func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.ButtonType) bool {
 	if e.Floor != btnFloor {
 		return false
@@ -138,14 +119,8 @@ func ShouldClearImmediately(e common.Elevator, btnFloor int, btnType elevio.Butt
 	}
 }
 
-// Choose next direction + behaviour
-func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehaviourPair {
-	//fmt.Printf("[DEBUG] ChooseDirection: floor=%d, prevDirn=%v\n", e.Floor, prevDirn)
-	//fmt.Println("RequestsHere:", RequestsHere(e))
-	//fmt.Println("RequestsAbove:", RequestsAbove(e))
-	//fmt.Println("RequestsBelow:", RequestsBelow(e))
-	fmt.Print()
 
+func ChooseDirection(e common.Elevator, prevDirn elevio.Dirn) common.DirnBehaviourPair {
 	switch prevDirn {
 	case elevio.MD_Up:
 		if RequestsAbove(e) {

@@ -5,6 +5,8 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/control"
 	"elevatorlab/pkg/network/localip"
+	"elevatorlab/pkg/network/peers"
+	"elevatorlab/pkg/hra"
 	"flag"
 	"fmt"
 	"os"
@@ -12,81 +14,94 @@ import (
 )
 
 func main() {
-	var myID string
-	var port string
-
-	// Define the command-line flags
+	// ────────────────────────────────
+	// Step 1: Get Elevator ID and Port
+	// ────────────────────────────────
+	var myID, port string
 	flag.StringVar(&myID, "id", "", "Elevator ID to use")
-	flag.StringVar(&port, "port", "15657", "Port to use for the elevator (default is 15657)")
+	flag.StringVar(&port, "port", "15657", "Port to use for I/O device")
 	flag.Parse()
 
-	// Check if the elevator ID is specified, if not we show the usage
-	if myID == "" && len(flag.Args()) < 1 {
-		fmt.Println("usage: go run main.go -id=[elevatorID] OR --auto")
-		return
-	}
-
-	// If --auto is provided, generate ID automatically
-	if myID == "" && flag.Args()[0] == "--auto" {
+	if myID == "" {
 		ip, err := localip.LocalIP()
 		if err != nil {
 			fmt.Println("Could not get local IP:", err)
 			return
 		}
-		myID = fmt.Sprintf("%s-%d", ip, os.Getpid()) //when running multiple elevators on the same machine
+		myID = fmt.Sprintf("%s-%d", ip, os.Getpid()) // Unique ID for each process
 		fmt.Println("Auto-generated ID:", myID)
-	} else if myID == "" {
-		// If no ID is given, print usage
-		fmt.Println("usage: go run main.go -id=[elevatorID] OR --auto")
-		return
 	}
+	fmt.Println("Starting elevator with ID:", myID)
 
-	// Print the elevator starting info
-	fmt.Printf("Elevator starting with ID: %s\n", myID)
-
-	// Initialize the elevator I/O
-	elevio.Init(fmt.Sprintf("localhost:%s", port), elevio.N_FLOORS)
+	// ────────────────────────────────
+	// Step 2: Initialize elevator hardware
+	// ────────────────────────────────
+	elevio.Init("localhost:"+port, elevio.N_FLOORS)
 
 	initial := common.Elevator{
 		ID:                  myID,
 		Floor:               elevio.GetFloor(),
 		Dirn:                elevio.MD_Stop,
 		Behaviour:           common.IDLE,
-		ClearRequestVariant: common.CV_All,
-		DoorOpenDuration:    500 * time.Millisecond,
+		ClearRequestVariant: common.CV_InDirn,
+		DoorOpenDuration:    3 * time.Second,
 	}
-	fmt.Println(2)
 
 	if initial.Floor == -1 {
-		fmt.Println("Starting between floors. Moving down to find floor...")
+		fmt.Println("[BOOT] Between floors, moving down to find one...")
 		elevio.SetMotorDirection(elevio.MD_Down)
 		for {
-			floor := elevio.GetFloor()
-			if floor != -1 {
+			if f := elevio.GetFloor(); f != -1 {
 				elevio.SetMotorDirection(elevio.MD_Stop)
-				initial.Floor = floor
+				initial.Floor = f
 				break
 			}
 		}
-
-		//added during blocking debugging:
-		for f := 0; f < common.N_FLOORS; f++ {
-			for btn := 0; btn < common.N_BUTTONS; btn++ {
-				initial.Requests[f][btn] = false
-			}
-		}
-		fmt.Println("[BOOT] Flushed all requests at startup.")
-		elevio.SetFloorIndicator(initial.Floor)
 	}
 
-	var emptyHallRequests [common.N_FLOORS][2]common.OrderState
-	control.UpdateAllLights(initial, emptyHallRequests)
+	elevio.SetFloorIndicator(initial.Floor)
 
-	initial.ClearRequestVariant = common.CV_InDirn
-	go control.RunElevState(myID, initial, 16570) //wrong port?
-	control.InitFSM(myID, initial)
-	control.InitAssigner(myID)
+	// ────────────────────────────────
+	// Step 3: Define Channels
+	// ────────────────────────────────
+	hallButtonPress := make(chan elevio.ButtonEvent, 10)                  // All hall calls
+	orderComplete := make(chan elevio.ButtonEvent, 10)                   // Signals a hall call was completed
+	existingOrders := make(chan [common.N_FLOORS][2]bool, 10)            // Confirmed orders from sync
+	allElevators := make(chan map[string]common.Elevator, 10)            // Shared elevator state
+	assignments := make(chan common.Elevator, 10)                        // HRA-assigned elevator state
+	elevTx := make(chan common.Elevator, 10)                             // Outbound elevator info to others
+	peerTxEnable := make(chan bool)
+
+	// ────────────────────────────────
+	// Step 4: Shared State
+	// ────────────────────────────────
+	go peers.Transmitter(15680, myID, peerTxEnable)
+	go control.RunElevatorState(myID, elevTx, allElevators)
+
+	// ────────────────────────────────
+	// Step 5: FSM
+	// ────────────────────────────────
+	go control.InitFSM(myID, initial)
+
+	// ────────────────────────────────
+	// Step 6: Door FSM (runs obstruction + close timer)
+	// ────────────────────────────────
+	go control.DoorFSM(control.DoorOpenChan, control.DoorCloseChan, initial.DoorOpenDuration)
+
+	// ────────────────────────────────
+	// Step 7: Synchronizer (hall order consensus logic)
+	// ────────────────────────────────
+	go control.RunSynchronizer(hallButtonPress, orderComplete, existingOrders, myID)
+
+	// ────────────────────────────────
+	// Step 8: HRA Coordinator (load balancing of hall calls)
+	// ────────────────────────────────
+	go hra.Coordinator(allElevators, existingOrders, myID, assignments)
 	
+	// ────────────────────────────────
+	// Step 9: Broadcast Initial Elevator State
+	// ────────────────────────────────
+	elevTx <- initial
 
-	select {}
+	select {} // Prevent main from exiting
 }
