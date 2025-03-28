@@ -1,7 +1,9 @@
 package main
+
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"elevatorlab/pkg/backup"
 	"elevatorlab/pkg/control"
 	"elevatorlab/pkg/hra"
 	"elevatorlab/pkg/network/localip"
@@ -11,11 +13,13 @@ import (
 	"os"
 	"time"
 )
+
 func main() {
 	channels := initializeChannels()
 	myID, port := getElevatorID()
 	initial := initializeElevator(port, myID)
-	var initializeLights [4][2] common.OrderState
+	backup.LoadCabRequests(&initial)
+	var initializeLights [4][2]common.OrderState
 	control.UpdateAllLights(initial, initializeLights)
 	startGoroutines(myID, initial, channels)
 	channels.elevTx <- initial
@@ -41,12 +45,12 @@ func getElevatorID() (string, string) {
 func initializeElevator(port, myID string) common.Elevator {
 	elevio.Init("localhost:"+port, elevio.N_FLOORS)
 	initial := common.Elevator{
-		ID: myID,
-		Floor: elevio.GetFloor(),
-		Dirn: elevio.MD_Stop,
-		Behaviour: common.IDLE,
+		ID:                  myID,
+		Floor:               elevio.GetFloor(),
+		Dirn:                elevio.MD_Stop,
+		Behaviour:           common.IDLE,
 		ClearRequestVariant: common.CV_InDirn,
-		DoorOpenDuration: 1 * time.Second,
+		DoorOpenDuration:    1 * time.Second,
 	}
 	if initial.Floor == -1 {
 		fmt.Println("[BOOT] Between floors, moving down to find one...")
@@ -62,30 +66,32 @@ func initializeElevator(port, myID string) common.Elevator {
 	elevio.SetFloorIndicator(initial.Floor)
 	return initial
 }
+
 type Channels struct {
 	hallButtonPress chan elevio.ButtonEvent
-	cabButtonPress chan elevio.ButtonEvent
-	orderComplete chan elevio.ButtonEvent
-	existingOrders chan [common.N_FLOORS][2]bool
-	allElevators chan map[string]common.Elevator
-	assignments chan common.Elevator
-	elevTx chan common.Elevator
-	peerTxEnable chan bool
-	elevSet chan control.ElevSetMsg
-	elevGet chan control.ElevGetMsg
+	cabButtonPress  chan elevio.ButtonEvent
+	orderComplete   chan elevio.ButtonEvent
+	existingOrders  chan [common.N_FLOORS][2]bool
+	allElevators    chan map[string]common.Elevator
+	assignments     chan common.Elevator
+	elevTx          chan common.Elevator
+	peerTxEnable    chan bool
+	elevSet         chan control.ElevSetMsg
+	elevGet         chan control.ElevGetMsg
 }
+
 func initializeChannels() Channels {
 	return Channels{
 		hallButtonPress: make(chan elevio.ButtonEvent, 3),
-		cabButtonPress: make(chan elevio.ButtonEvent, 3),
-		orderComplete: make(chan elevio.ButtonEvent, 3),
-		existingOrders: make(chan [common.N_FLOORS][2]bool, 10),
-		allElevators: make(chan map[string]common.Elevator, 6),
-		assignments: make(chan common.Elevator, 10),
-		elevTx: make(chan common.Elevator, 10),
-		peerTxEnable: make(chan bool),
-		elevSet: make(chan control.ElevSetMsg),
-		elevGet: make(chan control.ElevGetMsg),
+		cabButtonPress:  make(chan elevio.ButtonEvent, 3),
+		orderComplete:   make(chan elevio.ButtonEvent, 3),
+		existingOrders:  make(chan [common.N_FLOORS][2]bool, 10),
+		allElevators:    make(chan map[string]common.Elevator, 6),
+		assignments:     make(chan common.Elevator, 10),
+		elevTx:          make(chan common.Elevator, 10),
+		peerTxEnable:    make(chan bool),
+		elevSet:         make(chan control.ElevSetMsg),
+		elevGet:         make(chan control.ElevGetMsg),
 	}
 }
 func startGoroutines(myID string, initial common.Elevator, ch Channels) {
