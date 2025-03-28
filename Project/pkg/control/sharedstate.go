@@ -32,7 +32,7 @@ func RunElevState(myID string, initial common.Elevator, port int, allElevators c
 
 	go bcast.Transmitter(port, tx)        // Start sending our state to the network
 	go bcast.Receiver(port, rx)           // Start listening for other elevators' states
-	go peers.Receiver(15680, peerUpdates) // Start tracking connected peers
+	go peers.Receiver(15775, peerUpdates) // Start tracking connected peers
 
 	// This is the full map of all known elevators and their state
 	elevators := map[string]common.Elevator{

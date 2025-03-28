@@ -111,8 +111,8 @@ func initializeChannels() Channels {
 	}
 }
 func startGoroutines(myID string, initial common.Elevator, ch Channels) {
-	go peers.Transmitter(15680, myID, ch.peerTxEnable)
-	go control.RunElevState(myID, initial, 1650, ch.allElevators, ch.elevSet, ch.elevGet)
+	go peers.Transmitter(15775, myID, ch.peerTxEnable)
+	go control.RunElevState(myID, initial, 19575, ch.allElevators, ch.elevSet, ch.elevGet)
 	go control.InitFSM(myID, initial, ch.orderComplete, ch.hallButtonPress, ch.assignments, ch.elevSet, ch.elevGet, ch.existingOrders)
 	go control.RunSynchronizer(ch.hallButtonPress, ch.orderComplete, ch.existingOrders, myID, ch.cabButtonPress)
 	go hra.Coordinator(ch.allElevators, ch.existingOrders, myID, ch.assignments, ch.elevGet)

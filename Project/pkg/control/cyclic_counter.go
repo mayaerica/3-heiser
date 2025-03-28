@@ -18,11 +18,11 @@ func RunSynchronizer(
 	perspectiveRx := make(chan common.Perspective)
 	perspectiveTx := make(chan common.Perspective)
 
-	go bcast.Transmitter(21478, perspectiveTx)
-	go bcast.Receiver(21478, perspectiveRx)
+	go bcast.Transmitter(21557, perspectiveTx)
+	go bcast.Receiver(21557, perspectiveRx)
 
 	peerUpdateCh := make(chan peers.PeerUpdate)
-	go peers.Receiver(15680, peerUpdateCh)
+	go peers.Receiver(15775, peerUpdateCh)
 
 	savedCabCalls := make(map[string][4][1]common.OrderState)
 	localPerspective := [common.N_FLOORS][2]common.OrderState{}
@@ -85,21 +85,17 @@ func RunSynchronizer(
 				}
 			}
 
-
 		case peerList = <-peerUpdateCh:
 			for _, lost := range peerList.Lost {
 				savedCabCalls[lost] = perspectiveMap[lost].CabCalls
 				delete(perspectiveMap, lost)
 			}
 
-			
 			savedCabCalls[peerList.New] = perspectiveMap[peerList.New].CabCalls
 			var newPerspective [common.N_FLOORS][2]common.OrderState
 
-				
-			perspectiveTx <- common.Perspective{ID: peerList.New,Perspective: newPerspective, CabCalls: savedCabCalls[peerList.New] }
+			perspectiveTx <- common.Perspective{ID: peerList.New, Perspective: newPerspective, CabCalls: savedCabCalls[peerList.New]}
 			delete(savedCabCalls, peerList.New)
-			
 
 		case <-ticker.C:
 			perspectiveTx <- common.Perspective{ID: myID, Perspective: localPerspective}
