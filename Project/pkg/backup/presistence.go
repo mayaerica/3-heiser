@@ -8,58 +8,60 @@ import (
 	"os"
 )
 
+const BackupFile = "backup.json"
 
-const backupFile = "backup.json"
+type ElevatorState struct {
+	CabRequests [common.N_FLOORS]bool
+	Direction   elevio.Dirn
+}
 
 func SaveCabRequests(elevator common.Elevator) {
-	
 	var cabRequests [common.N_FLOORS]bool
 
-	
+	// Sauvegarder les requêtes de la cabine
 	for floor := 0; floor < common.N_FLOORS; floor++ {
-		
 		cabRequests[floor] = elevator.Requests[floor][elevio.BT_Cab]
 	}
 
-	
-	data, err := json.Marshal(cabRequests)
+	// Sauvegarder l'état complet
+	state := ElevatorState{
+		CabRequests: cabRequests,
+		Direction:   elevator.Dirn,
+	}
+
+	data, err := json.Marshal(state)
 	if err != nil {
-	
-		log.Printf("backup: failed to marshal cab requests: %v", err)
+		log.Printf("backup: failed to marshal elevator state: %v", err)
 		return
 	}
 
-	
-	err = os.WriteFile(backupFile, data, 0644)
+	err = os.WriteFile(BackupFile, data, 0644)
 	if err != nil {
-		
 		log.Printf("backup: failed to write file: %v", err)
 	}
 }
 
-
 func LoadCabRequests(elevator *common.Elevator) {
-	
-	data, err := os.ReadFile(backupFile)
+	data, err := os.ReadFile(BackupFile)
 	if err != nil {
-		
 		log.Printf("backup: no backup file found: %v", err)
 		return
 	}
 
-	var cabRequests [common.N_FLOORS]bool
-
-	err = json.Unmarshal(data, &cabRequests)
+	var state ElevatorState
+	err = json.Unmarshal(data, &state)
 	if err != nil {
-		log.Printf("backup: failed to unmarshal cab requests: %v", err)
+		log.Printf("backup: failed to unmarshal elevator state: %v", err)
 		return
 	}
-	
+
+	// Restaurer les requêtes de cabine
 	for floor := 0; floor < common.N_FLOORS; floor++ {
-		if cabRequests[floor] {
+		if state.CabRequests[floor] {
 			elevator.Requests[floor][elevio.BT_Cab] = true
 		}
 	}
+
+	// Restaurer la direction de l'ascenseur
+	elevator.Dirn = state.Direction
 }
-
-

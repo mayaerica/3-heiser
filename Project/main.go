@@ -18,7 +18,7 @@ func main() {
 	channels := initializeChannels()
 	myID, port := getElevatorID()
 	initial := initializeElevator(port, myID)
-	backup.LoadCabRequests(&initial)
+	elevio.SetFloorIndicator(initial.Floor)
 	var initializeLights [4][2]common.OrderState
 	control.UpdateAllLights(initial, initializeLights)
 	startGoroutines(myID, initial, channels)
@@ -52,18 +52,34 @@ func initializeElevator(port, myID string) common.Elevator {
 		ClearRequestVariant: common.CV_InDirn,
 		DoorOpenDuration:    1 * time.Second,
 	}
-	if initial.Floor == -1 {
-		fmt.Println("[BOOT] Between floors, moving down to find one...")
-		elevio.SetMotorDirection(elevio.MD_Down)
-		for {
-			if f := elevio.GetFloor(); f != -1 {
-				elevio.SetMotorDirection(elevio.MD_Stop)
-				initial.Floor = f
-				break
+	_, err := os.Stat(backup.BackupFile)
+	if err == nil {
+		fmt.Println("hey")
+		backup.LoadCabRequests(&initial)
+		if initial.Floor == -1 {
+			fmt.Println("[BOOT] Between floors, moving down to find one...")
+			elevio.SetMotorDirection(initial.Dirn)
+			for {
+				if f := elevio.GetFloor(); f != -1 {
+					elevio.SetMotorDirection(initial.Dirn)
+					initial.Floor = f
+					break
+				}
+			}
+		}
+	} else {
+		if initial.Floor == -1 {
+			fmt.Println("[BOOT] Between floors, moving down to find one...")
+			elevio.SetMotorDirection(elevio.MD_Down)
+			for {
+				if f := elevio.GetFloor(); f != -1 {
+					elevio.SetMotorDirection(elevio.MD_Down)
+					initial.Floor = f
+					break
+				}
 			}
 		}
 	}
-	elevio.SetFloorIndicator(initial.Floor)
 	return initial
 }
 
