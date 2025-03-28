@@ -3,6 +3,7 @@ package control
 import (
 	"elevatorlab/common"
 	"elevatorlab/elevio"
+	"elevatorlab/pkg/backup"
 	"fmt"
 	"time"
 )
@@ -34,7 +35,6 @@ func InitFSM(myID string,
 	}}
 	DoorOpenChan := make(chan struct{})
 	DoorCloseChan := make(chan struct{})
-	
 
 	go StateMachineLoop(myID, DoorOpenChan, DoorCloseChan, ExistingOrdersChan, orderComplete, hallButtonPress, eFromHRA, ElevSet, ElevGet)
 	go DoorFSM(DoorOpenChan, DoorCloseChan, initial.DoorOpenDuration)
@@ -71,7 +71,7 @@ func StateMachineLoop(
 		case btn := <-buttonPressChan:
 			fmt.Println("[FSM]: Button pressed")
 			e := GetMyElevator(myID, ElevGet)
-			
+
 			switch e.Behaviour {
 			case common.DOOR_OPEN:
 				fmt.Println("[FSM]: DOOR OPEN")
@@ -113,6 +113,7 @@ func StateMachineLoop(
 				} else {
 					if btn.Button == elevio.BT_Cab {
 						e.Requests[btn.Floor][btn.Button] = true
+						backup.SaveCabRequests(e)
 						UpdateCabLights(e)
 						WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
 						trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
@@ -160,7 +161,7 @@ func StateMachineLoop(
 			})
 			e := GetMyElevator(myID, ElevGet)
 			if e.Behaviour == common.IDLE {
-			trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
+				trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
 			} else if e.Behaviour == common.DOOR_OPEN {
 				e = clearAtCurrentFloor(e, OrderCompleteChan)
 				UpdateCabLights(e)
