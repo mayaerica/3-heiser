@@ -98,6 +98,7 @@ func StateMachineLoop(
 				fmt.Println("[FSM]: MOVING")
 				if btn.Button == elevio.BT_Cab {
 					e.Requests[btn.Floor][btn.Button] = true
+					backup.SaveCabRequests(e)
 					UpdateCabLights(e)
 					WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
 				} else {
