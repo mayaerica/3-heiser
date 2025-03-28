@@ -5,7 +5,6 @@ import (
 	"elevatorlab/elevio"
 	"elevatorlab/pkg/network/bcast"
 	"elevatorlab/pkg/network/peers"
-	"fmt"
 	"time"
 )
 
@@ -32,7 +31,7 @@ func RunSynchronizer(
 
 	for {
 		UpdateHallLightsFromPerspective(localPerspective)
-		fmt.Println("Local perspective %v", localPerspective)
+		//fmt.Println("Local perspective %v", localPerspective)
 		select {
 		case btn := <-hallButtonPress:
 			if localPerspective[btn.Floor][btn.Button] == common.NotSeen || localPerspective[btn.Floor][btn.Button] == common.Uncertain {

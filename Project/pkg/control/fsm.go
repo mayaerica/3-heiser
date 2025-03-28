@@ -63,9 +63,10 @@ func StateMachineLoop(
 	go elevio.PollFloorSensor(floorSensorChan)
 
 	//trigger := make(chan struct{}, 3)
-	var prevDirn elevio.Dirn = elevio.MD_Stop
+	//var prevDirn elevio.Dirn = elevio.MD_Stop
 
 	for {
+		PrintElevatorState(myID, ElevGet)
 		select {
 		case btn := <-buttonPressChan:
 			fmt.Println("[FSM]: Button pressed")
@@ -114,7 +115,7 @@ func StateMachineLoop(
 						e.Requests[btn.Floor][btn.Button] = true
 						UpdateCabLights(e)
 						WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
-						prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
+						trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
 					} else {
 						hallButtonPress <- btn
 					}
@@ -134,7 +135,6 @@ func StateMachineLoop(
 			if e.Behaviour == common.MOVING && RequestShouldStop(e) {
 				e = clearAtCurrentFloor(e, OrderCompleteChan)
 				UpdateCabLights(e)
-				prevDirn = e.Dirn
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				e.Behaviour = common.DOOR_OPEN
 				WithMyElevator(myID, ElevSet, func(me *common.Elevator) { *me = e })
@@ -148,7 +148,7 @@ func StateMachineLoop(
 			})
 			elevio.SetDoorOpenLamp(false)
 
-			prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
+			trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
 
 		case assigned := <-eFromHRA:
 			fmt.Println("[FSM]: Recieved assigned tasks")
@@ -160,7 +160,7 @@ func StateMachineLoop(
 			})
 			e := GetMyElevator(myID, ElevGet)
 			if e.Behaviour == common.IDLE {
-				prevDirn = trigger(myID, ElevGet, prevDirn, OrderCompleteChan, ElevSet, DoorOpenChan)
+			trigger(myID, ElevGet, OrderCompleteChan, ElevSet, DoorOpenChan)
 			} else if e.Behaviour == common.DOOR_OPEN {
 				e = clearAtCurrentFloor(e, OrderCompleteChan)
 				UpdateCabLights(e)
@@ -171,11 +171,10 @@ func StateMachineLoop(
 		}
 	}
 }
-func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCompleteChan chan elevio.ButtonEvent, ElevSet chan ElevSetMsg, DoorOpenChan chan struct{}) elevio.Dirn {
+func trigger(myID string, ElevGet chan ElevGetMsg, OrderCompleteChan chan elevio.ButtonEvent, ElevSet chan ElevSetMsg, DoorOpenChan chan struct{}) {
 	fmt.Println("[FSM]: trigger")
 	e := GetMyElevator(myID, ElevGet)
-	next := ChooseDirection(e, prevDirn)
-	prevDirn = e.Dirn
+	next := ChooseDirection(e, e.Dirn)
 	e.Dirn = next.Dirn
 	e.Behaviour = next.Behaviour
 
@@ -196,7 +195,6 @@ func trigger(myID string, ElevGet chan ElevGetMsg, prevDirn elevio.Dirn, OrderCo
 
 	elevio.SetMotorDirection(e.Dirn)
 	fmt.Printf("[FSM] Requests: %+v\n", e.Requests)
-	return prevDirn
 }
 
 // for {

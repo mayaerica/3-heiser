@@ -58,7 +58,7 @@ func main() {
 			}
 		}
 	}
-
+ 
 	elevio.SetFloorIndicator(initial.Floor)
 
 	// ────────────────────────────────
