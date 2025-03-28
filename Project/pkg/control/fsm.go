@@ -71,7 +71,7 @@ func StateMachineLoop(
 		case btn := <-buttonPressChan:
 			fmt.Println("[FSM]: Button pressed")
 			e := GetMyElevator(myID, ElevGet)
-
+			
 			switch e.Behaviour {
 			case common.DOOR_OPEN:
 				fmt.Println("[FSM]: DOOR OPEN")

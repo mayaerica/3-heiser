@@ -43,6 +43,8 @@ const (
 type Perspective struct {
 	ID          string
 	Perspective [N_FLOORS][2]OrderState
+	CabCalls [N_FLOORS][1]OrderState
+
 }
 
 type ClearRequestVariant int

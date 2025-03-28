@@ -13,6 +13,7 @@ func RunSynchronizer(
 	orderComplete <-chan elevio.ButtonEvent,
 	existingOrders chan<- [common.N_FLOORS][2]bool,
 	myID string,
+	cabButtonPress <-chan elevio.ButtonEvent,
 ) {
 	perspectiveRx := make(chan common.Perspective)
 	perspectiveTx := make(chan common.Perspective)
@@ -23,6 +24,7 @@ func RunSynchronizer(
 	peerUpdateCh := make(chan peers.PeerUpdate)
 	go peers.Receiver(15680, peerUpdateCh)
 
+	savedCabCalls := make(map[string][4][1]common.OrderState)
 	localPerspective := [common.N_FLOORS][2]common.OrderState{}
 	peerList := peers.PeerUpdate{}
 	perspectiveMap := make(map[string]common.Perspective)
@@ -33,6 +35,7 @@ func RunSynchronizer(
 		UpdateHallLightsFromPerspective(localPerspective)
 		//fmt.Println("Local perspective %v", localPerspective)
 		select {
+
 		case btn := <-hallButtonPress:
 			if localPerspective[btn.Floor][btn.Button] == common.NotSeen || localPerspective[btn.Floor][btn.Button] == common.Uncertain {
 				localPerspective[btn.Floor][btn.Button] = common.SeenBySomeone
@@ -82,10 +85,21 @@ func RunSynchronizer(
 				}
 			}
 
+
 		case peerList = <-peerUpdateCh:
 			for _, lost := range peerList.Lost {
+				savedCabCalls[lost] = perspectiveMap[lost].CabCalls
 				delete(perspectiveMap, lost)
 			}
+
+			
+			savedCabCalls[peerList.New] = perspectiveMap[peerList.New].CabCalls
+			var newPerspective [common.N_FLOORS][2]common.OrderState
+
+				
+			perspectiveTx <- common.Perspective{ID: peerList.New,Perspective: newPerspective, CabCalls: savedCabCalls[peerList.New] }
+			delete(savedCabCalls, peerList.New)
+			
 
 		case <-ticker.C:
 			perspectiveTx <- common.Perspective{ID: myID, Perspective: localPerspective}
