@@ -1,0 +1,207 @@
+package elevio
+
+import (
+	"fmt"
+	"net"
+	"sync"
+	"time"
+)
+
+const N_FLOORS int = 4
+const N_BUTTONS int = 3
+
+const _pollRate = 20 * time.Millisecond
+
+var _initialized bool = false
+var _numFloors int = N_FLOORS
+var _mtx sync.Mutex
+var _conn net.Conn
+
+type Dirn int
+
+const (
+	MD_Up   Dirn = 1
+	MD_Down Dirn = -1
+	MD_Stop Dirn = 0
+)
+
+type ButtonType int
+
+const (
+	BT_HallUp ButtonType = iota
+	BT_HallDown
+	BT_Cab
+)
+
+type ButtonEvent struct {
+	Floor  int
+	Button ButtonType
+}
+
+func Init(addr string, numFloors int) {
+	if _initialized {
+		return
+	}
+	_numFloors = numFloors
+	_mtx = sync.Mutex{}
+	var err error
+	_conn, err = net.Dial("tcp", addr)
+	if err != nil {
+		panic(err.Error())
+	}
+	_initialized = true
+}
+
+func SetMotorDirection(dir Dirn) [4]byte {
+	dataToWrite := [4]byte{1, byte(dir), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
+}
+
+func SetButtonLamp(button ButtonType, floor int, value bool) [4]byte {
+	dataToWrite := [4]byte{2, byte(button), byte(floor), ToByte(value)}
+	write(dataToWrite)
+	return dataToWrite
+}
+
+func SetFloorIndicator(floor int) [4]byte {
+	dataToWrite := [4]byte{3, byte(floor), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
+}
+
+func SetDoorOpenLamp(value bool) [4]byte {
+	dataToWrite := [4]byte{4, ToByte(value), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
+}
+
+func SetStopLamp(value bool) [4]byte {
+	dataToWrite := [4]byte{5, ToByte(value), 0, 0}
+	write(dataToWrite)
+	return dataToWrite
+}
+
+func PollButtons(receiver chan<- ButtonEvent) {
+	prev := make([][3]bool, _numFloors)
+	for {
+		time.Sleep(_pollRate)
+		for f := 0; f < _numFloors; f++ {
+			for b := ButtonType(0); b < 3; b++ {
+				v := GetButton(b, f)
+				if v != prev[f][b] && v != false {
+					receiver <- ButtonEvent{f, ButtonType(b)}
+
+				}
+				prev[f][b] = v
+			}
+		}
+	}
+}
+
+func PollFloorSensor(receiver chan<- int) {
+	prev := -1
+	for {
+		time.Sleep(_pollRate)
+		v := GetFloor()
+		if v != prev && v != -1 {
+			receiver <- v
+		}
+		prev = v
+	}
+}
+
+func PollStopButton(receiver chan<- bool) {
+	prev := false
+	for {
+		time.Sleep(_pollRate)
+		v := GetStop()
+		if v != prev {
+			receiver <- v
+		}
+		prev = v
+	}
+}
+
+func PollObstructionSwitch(receiver chan<- bool) {
+	prev := false
+	for {
+		time.Sleep(_pollRate)
+		v := GetObstruction()
+		if v != prev {
+			receiver <- v
+		}
+		prev = v
+	}
+}
+
+func GetButton(button ButtonType, floor int) bool {
+	a := read([4]byte{6, byte(button), byte(floor), 0})
+	return ToBool(a[1])
+}
+
+func GetFloor() int {
+	a := read([4]byte{7, 0, 0, 0})
+	if a[1] != 0 {
+		return int(a[2])
+	} else {
+		return -1
+	}
+}
+
+func GetStop() bool {
+	a := read([4]byte{8, 0, 0, 0})
+	return ToBool(a[1])
+}
+
+func GetObstruction() bool {
+	a := read([4]byte{9, 0, 0, 0})
+	return ToBool(a[1])
+}
+
+func read(in [4]byte) [4]byte {
+	_mtx.Lock()
+	defer _mtx.Unlock()
+
+	_, err := _conn.Write(in[:])
+	if err != nil {
+		fmt.Println(fmt.Errorf("lost connection to Elevator Server: %v", err)) // Log error
+		return [4]byte{0, 0, 0, 0}
+	}
+
+	var out [4]byte
+	_, err = _conn.Read(out[:])
+	if err != nil {
+		fmt.Println(fmt.Errorf("lost connection to Elevator Server: %v", err)) // Log error
+		return [4]byte{0, 0, 0, 0}
+	}
+
+	return out
+}
+
+func write(in [4]byte) error {
+	_mtx.Lock()
+	defer _mtx.Unlock()
+
+	_, err := _conn.Write(in[:])
+	if err != nil {
+		return fmt.Errorf("lost connection to Elevator Server: %w", err)
+	}
+	return nil
+}
+
+func ToByte(a bool) byte {
+	var b byte = 0
+	if a {
+		b = 1
+	}
+	return b
+}
+
+func ToBool(a byte) bool {
+	var b bool = false
+	if a != 0 {
+		b = true
+	}
+	return b
+}
